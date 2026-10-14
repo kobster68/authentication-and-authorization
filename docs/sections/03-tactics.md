@@ -39,7 +39,12 @@ The work is done by these classes, in the order a request meets them:
 2. `ProviderManager` (Spring Security) is the authentication manager. It hands the credentials to
    its provider and publishes an `AuthenticationSuccessEvent` when the provider accepts them, or a
    subclass of `AbstractAuthenticationFailureEvent` when it rejects them. These events are how the audit listener learns about each
-   attempt; nothing in our code calls the audit log directly.
+   attempt; nothing in our code calls the audit log directly. There is one gap: a malformed
+   `Authorization: Basic` header (not Base64, or no `username:password` inside) is rejected by
+   Spring's `BasicAuthenticationConverter` before `ProviderManager` runs, so the caller gets a 401
+   but no failure event is published and the attempt never reaches the audit log; a header with a
+   scheme other than Basic is simply ignored, and the caller is treated as anonymous. Only attempts
+   that present a username and password that can be read are recorded.
 3. `DaoAuthenticationProvider` (Spring Security) loads the user by name and compares the password.
 4. `DemoUserDetailsService` (our `authn` package) is the user store. It looks the name up among the
    five seeded users and returns a new `ClinicUser`, which carries the user's role and, for a

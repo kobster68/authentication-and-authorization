@@ -46,6 +46,11 @@ request. The PlantUML sources and text renderings are next to the images in `uml
 
 Nothing is kept afterwards. The next request from the same client repeats all six steps.
 
+Step 6 describes the finished system, with the URL rules and the `/api/me` service in place. Until
+those are merged, the authorization scaffold denies every URL except the public one, so on the
+authentication work alone this same request is authenticated (steps 1 to 5 happen exactly as shown)
+and is then refused at `AuthorizationFilter`.
+
 ### Login failure
 
 ![Login failure](../../uml/sequence/login-failure.png)
