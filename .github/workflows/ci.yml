@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository (full history, for the commit-trailer check)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # Compiles, runs the tests, and repackages target/authentication-and-authorization.jar
+      # as the executable jar used by the demo step below.
+      - name: Build and test
+        run: mvn -B verify
+
+      - name: Hygiene lint
+        run: scripts/lint.sh
+
+      - name: Demo against the packaged jar
+        run: |
+          java -jar target/authentication-and-authorization.jar --server.port=18731 > "$RUNNER_TEMP/server.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 60); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:18731/api/public/info)" = "200" ]; then
+              break
+            fi
+            sleep 1
+          done
+          scripts/demo.sh http://localhost:18731
+
+      - name: Show the server log
+        if: failure()
+        run: cat "$RUNNER_TEMP/server.log" || true
