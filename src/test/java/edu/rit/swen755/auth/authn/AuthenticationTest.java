@@ -15,7 +15,6 @@ import org.springframework.security.authentication.event.AuthenticationSuccessEv
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
-import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -34,7 +33,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -56,15 +54,19 @@ class AuthenticationTest {
     @Autowired
     private ApplicationEvents events;
 
-    @Test
-    void noCredentialsOnAProtectedUrlIs401WithChallengeAndJsonBody() throws Exception {
-        mvc.perform(get("/api/me"))
+    /** The exact 401 body for a request to {@code path}. */
+    private static String unauthorizedBody(String path) {
+        return "{\"status\":401,\"error\":\"Unauthorized\",\"path\":\"" + path + "\"}";
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/api/me", "/api/patients/1/record", "/api/admin/audit"})
+    void noCredentialsOnAProtectedUrlIs401WithChallengeAndJsonBody(String path) throws Exception {
+        mvc.perform(get(path))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Basic realm=")))
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value(401))
-                .andExpect(jsonPath("$.error").value("Unauthorized"))
-                .andExpect(jsonPath("$.path").value("/api/me"));
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE))
+                .andExpect(content().string(unauthorizedBody(path)));
     }
 
     @Test
@@ -96,7 +98,8 @@ class AuthenticationTest {
     void anonymousOnAnUnmappedUrlIs401NotForbidden() throws Exception {
         mvc.perform(get("/api/nothing"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Basic realm=")));
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Basic realm=")))
+                .andExpect(content().string(unauthorizedBody("/api/nothing")));
     }
 
     @Test
@@ -120,36 +123,15 @@ class AuthenticationTest {
                 "expected an authentication success event for alice");
     }
 
-    @Test
-    void userStoreThrowsOnlyUsernameNotFoundForUnknownNames() {
-        assertThrowsExactly(UsernameNotFoundException.class, () -> users.loadUserByUsername("mallory"));
-        assertThrowsExactly(UsernameNotFoundException.class, () -> users.loadUserByUsername(""));
-        assertThrowsExactly(UsernameNotFoundException.class, () -> users.loadUserByUsername("ALICE"));
+    @ParameterizedTest
+    @ValueSource(strings = {"mallory", "", "ALICE", "Admin", "admin ", " alice", "nurse.patel:patel-pass", "dr"})
+    void userStoreThrowsOnlyUsernameNotFoundForUnknownNames(String name) {
+        // Unknown names, including near misses of real ones (no case folding or trimming), must
+        // fail with exactly this exception, or a caller could tell them apart from a wrong password.
+        assertThrowsExactly(UsernameNotFoundException.class, () -> users.loadUserByUsername(name));
     }
 
     // ---------------------------------------------------------------- finer tests
-
-    @Test
-    void theBodyIsJsonWithExactlyStatusErrorAndPath() throws Exception {
-        mvc.perform(get("/api/me"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE))
-                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"clinic\""))
-                .andExpect(content().json("{\"status\":401,\"error\":\"Unauthorized\",\"path\":\"/api/me\"}",
-                        JsonCompareMode.STRICT))
-                .andExpect(content().string("{\"status\":401,\"error\":\"Unauthorized\",\"path\":\"/api/me\"}"));
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"/api/me", "/api/patients/1/record", "/api/admin/audit", "/api/nothing"})
-    void anonymousIs401WithThePathOfTheRequest(String path) throws Exception {
-        mvc.perform(get(path))
-                .andExpect(status().isUnauthorized())
-                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Basic realm=")))
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value(401))
-                .andExpect(jsonPath("$.path").value(path));
-    }
 
     @Test
     void anonymousWriteIs401NotForbidden() throws Exception {
@@ -157,7 +139,7 @@ class AuthenticationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"systolic\":120,\"diastolic\":80,\"pulse\":72}"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.path").value("/api/patients/1/vitals"));
+                .andExpect(content().string(unauthorizedBody("/api/patients/1/vitals")));
     }
 
     @ParameterizedTest
@@ -168,7 +150,12 @@ class AuthenticationTest {
         mvc.perform(get("/api/me").header(HttpHeaders.AUTHORIZATION, authorization))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Basic realm=")))
-                .andExpect(jsonPath("$.path").value("/api/me"));
+                .andExpect(content().string(unauthorizedBody("/api/me")));
+
+        // The header is rejected before the authentication manager runs, so no failure event is
+        // published and the attempt does not reach the audit log (a known gap, documented in
+        // Section 3 of the design document).
+        assertEquals(0, events.stream(AbstractAuthenticationFailureEvent.class).count());
     }
 
     @Test
@@ -211,13 +198,5 @@ class AuthenticationTest {
         assertEquals(2, events.stream(AuthenticationSuccessEvent.class)
                 .filter(e -> "alice".equals(e.getAuthentication().getName()))
                 .count());
-    }
-
-    @Test
-    void userStoreDoesNotNormaliseNames() {
-        // Near misses of real names are unknown users too, and fail the same way.
-        for (String name : List.of("admin ", " alice", "Admin", "nurse.patel:patel-pass", "dr")) {
-            assertThrowsExactly(UsernameNotFoundException.class, () -> users.loadUserByUsername(name), name);
-        }
     }
 }

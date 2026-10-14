@@ -1,11 +1,10 @@
 package edu.rit.swen755.auth.authn;
 
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import edu.rit.swen755.auth.web.ApiError;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
@@ -37,25 +36,9 @@ public class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
     }
 
     /**
-     * The JSON body of a 401. The property order is fixed so the body reads the same in every
-     * response and in the documentation.
-     *
-     * @param status always 401
-     * @param error  always {@code Unauthorized}
-     * @param path   the request URI
-     */
-    @JsonPropertyOrder({"status", "error", "path"})
-    record Body(int status, String error, String path) {
-    }
-
-    /**
-     * Writes the challenge.
-     *
-     * <p>Required behaviour (slice 1: Godson): status 401; header
-     * {@code WWW-Authenticate: Basic realm="clinic"}; content type {@code application/json};
-     * body {@code {"status":401,"error":"Unauthorized","path":"<request URI>"}}. The body must not
-     * depend on why authentication failed, so a wrong password and an unknown user produce
-     * byte-identical responses.
+     * Writes the challenge: status 401, the {@link #CHALLENGE} header, and an {@link ApiError}
+     * body. Nothing in the response depends on why authentication failed, so a wrong password and
+     * an unknown user produce byte-identical responses.
      *
      * @param request  the request that failed authentication
      * @param response the response to write
@@ -66,12 +49,7 @@ public class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException failure)
             throws IOException, ServletException {
-        byte[] body = json.writeValueAsBytes(
-                new Body(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized", request.getRequestURI()));
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setHeader(HttpHeaders.WWW_AUTHENTICATE, CHALLENGE);
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setContentLength(body.length);
-        response.getOutputStream().write(body);
+        ApiError.write(response, json, HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized", request);
     }
 }
