@@ -1,25 +1,37 @@
 package edu.rit.swen755.auth.authn;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.event.AbstractAuthenticationFailureEvent;
+import org.springframework.security.authentication.event.AuthenticationFailureBadCredentialsEvent;
 import org.springframework.security.authentication.event.AuthenticationSuccessEvent;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
+import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import java.util.List;
 
 import static edu.rit.swen755.auth.TestFixtures.password;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -113,5 +125,99 @@ class AuthenticationTest {
         assertThrowsExactly(UsernameNotFoundException.class, () -> users.loadUserByUsername("mallory"));
         assertThrowsExactly(UsernameNotFoundException.class, () -> users.loadUserByUsername(""));
         assertThrowsExactly(UsernameNotFoundException.class, () -> users.loadUserByUsername("ALICE"));
+    }
+
+    // ---------------------------------------------------------------- finer tests
+
+    @Test
+    void theBodyIsJsonWithExactlyStatusErrorAndPath() throws Exception {
+        mvc.perform(get("/api/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE))
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"clinic\""))
+                .andExpect(content().json("{\"status\":401,\"error\":\"Unauthorized\",\"path\":\"/api/me\"}",
+                        JsonCompareMode.STRICT))
+                .andExpect(content().string("{\"status\":401,\"error\":\"Unauthorized\",\"path\":\"/api/me\"}"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/api/me", "/api/patients/1/record", "/api/admin/audit", "/api/nothing"})
+    void anonymousIs401WithThePathOfTheRequest(String path) throws Exception {
+        mvc.perform(get(path))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Basic realm=")))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.path").value(path));
+    }
+
+    @Test
+    void anonymousWriteIs401NotForbidden() throws Exception {
+        mvc.perform(post("/api/patients/1/vitals")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"systolic\":120,\"diastolic\":80,\"pulse\":72}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.path").value("/api/patients/1/vitals"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Basic", "Basic !!!not-base64!!!", "Basic bm9jb2xvbg==", "Bearer abc.def.ghi"})
+    void aMalformedOrForeignAuthorizationHeaderIs401Not500(String authorization) throws Exception {
+        // "bm9jb2xvbg==" decodes to "nocolon": valid Base64 but no username:password separator.
+        // A non-Basic scheme is ignored by the Basic filter, so the caller is simply anonymous.
+        mvc.perform(get("/api/me").header(HttpHeaders.AUTHORIZATION, authorization))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Basic realm=")))
+                .andExpect(jsonPath("$.path").value("/api/me"));
+    }
+
+    @Test
+    void unknownUserAndWrongPasswordGetTheSameStatusAndHeaders() throws Exception {
+        MvcResult wrongPassword = mvc.perform(get("/api/me").with(httpBasic("nurse.patel", "wrong"))).andReturn();
+        MvcResult unknownUser = mvc.perform(get("/api/me").with(httpBasic("mallory", "x"))).andReturn();
+
+        assertEquals(wrongPassword.getResponse().getStatus(), unknownUser.getResponse().getStatus());
+        for (String name : List.of(HttpHeaders.WWW_AUTHENTICATE, HttpHeaders.CONTENT_TYPE, HttpHeaders.CONTENT_LENGTH)) {
+            assertEquals(wrongPassword.getResponse().getHeaders(name), unknownUser.getResponse().getHeaders(name),
+                    name + " must not differ between an unknown user and a wrong password");
+        }
+    }
+
+    @Test
+    void unknownUserAndWrongPasswordPublishTheSameFailureEvent() throws Exception {
+        mvc.perform(get("/api/me").with(httpBasic("nurse.patel", "wrong"))).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/me").with(httpBasic("mallory", "x"))).andExpect(status().isUnauthorized());
+
+        List<AbstractAuthenticationFailureEvent> failures = events.stream(AbstractAuthenticationFailureEvent.class).toList();
+        assertEquals(List.of("nurse.patel", "mallory"),
+                failures.stream().map(e -> e.getAuthentication().getName()).toList());
+        for (AbstractAuthenticationFailureEvent failure : failures) {
+            assertInstanceOf(AuthenticationFailureBadCredentialsEvent.class, failure);
+            assertEquals(BadCredentialsException.class, failure.getException().getClass(),
+                    "an unknown user must be reported as bad credentials, like a wrong password");
+        }
+    }
+
+    @Test
+    void everyAuthenticatedRequestAuthenticatesAgain() throws Exception {
+        // Stateless HTTP Basic keeps no session, so each request is a fresh authentication.
+        for (int i = 0; i < 2; i++) {
+            MvcResult result = mvc.perform(get("/api/public/info").with(httpBasic("alice", password("alice"))))
+                    .andExpect(status().isOk())
+                    .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
+                    .andReturn();
+            assertNull(result.getRequest().getSession(false), "no session may be created");
+        }
+        assertEquals(2, events.stream(AuthenticationSuccessEvent.class)
+                .filter(e -> "alice".equals(e.getAuthentication().getName()))
+                .count());
+    }
+
+    @Test
+    void userStoreDoesNotNormaliseNames() {
+        // Near misses of real names are unknown users too, and fail the same way.
+        for (String name : List.of("admin ", " alice", "Admin", "nurse.patel:patel-pass", "dr")) {
+            assertThrowsExactly(UsernameNotFoundException.class, () -> users.loadUserByUsername(name), name);
+        }
     }
 }
