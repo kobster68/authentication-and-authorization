@@ -25,7 +25,9 @@ import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static edu.rit.swen755.auth.ContractSmokeTest.password;
+import static edu.rit.swen755.auth.TestFixtures.PRESCRIPTION;
+import static edu.rit.swen755.auth.TestFixtures.VITALS;
+import static edu.rit.swen755.auth.TestFixtures.password;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
@@ -48,9 +50,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @RecordApplicationEvents
 class AuthorizationTest {
-
-    private static final String PRESCRIPTION = "{\"drug\":\"amoxicillin\",\"dose\":\"500mg\"}";
-    private static final String VITALS = "{\"systolic\":120,\"diastolic\":80,\"pulse\":72}";
 
     @Autowired
     private MockMvc mvc;

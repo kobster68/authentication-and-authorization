@@ -5,6 +5,7 @@
 #   body  '-', 'vitals' or 'prescription' (sent as JSON)
 # The trailing '# needs:' field names the slices a row depends on (0 = Step 0 alone).
 # A row is uncommented by the pull request that completes its needs set.
+# AccessMatrixTest reads every row of this file, commented out or not, so keep the format exact.
 #
 # expected  method  path                              user               body          # needs: <slices>
 

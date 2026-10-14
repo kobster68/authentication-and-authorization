@@ -1,70 +1,80 @@
 package edu.rit.swen755.auth.access;
 
+import edu.rit.swen755.auth.authn.ClinicUser;
+import edu.rit.swen755.auth.authn.DemoUsers;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.security.test.context.support.WithUserDetails;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Acceptance tests for the per-actor own-record check (slice 2), calling the guard directly with
- * the security context that the test annotations install.
+ * Acceptance tests for the per-actor own-record check (slice 2): plain unit tests of the guard,
+ * no Spring context.
  */
 @Disabled("TODO(slice 2: Kobe) — enable when implementing")
-@SpringBootTest
-@AutoConfigureMockMvc
 class OwnRecordGuardTest {
 
-    @Autowired
-    private OwnRecordGuard guard;
+    private final OwnRecordGuard guard = new OwnRecordGuard();
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void adminMayReadAnyPatient() {
-        assertStaffAllowedForAnyId();
+        assertAllowedForAnyId(staff("ROLE_ADMIN"));
     }
 
     @Test
-    @WithMockUser(roles = "DOCTOR")
     void doctorMayReadAnyPatient() {
-        assertStaffAllowedForAnyId();
+        assertAllowedForAnyId(staff("ROLE_DOCTOR"));
     }
 
     @Test
-    @WithMockUser(roles = "NURSE")
     void nurseMayReadAnyPatient() {
-        assertStaffAllowedForAnyId();
+        assertAllowedForAnyId(staff("ROLE_NURSE"));
     }
 
     @Test
-    @WithUserDetails("alice")
     void patientMayReadOnlyTheirOwnRecord() {
-        assertTrue(guard.allows(current(), 1));
-        assertFalse(guard.allows(current(), 2));
-        assertFalse(guard.allows(current(), 99));
+        Authentication alice = signedIn(clinicUser("alice"));
+        assertTrue(guard.allows(alice, 1));
+        assertFalse(guard.allows(alice, 2));
+        assertFalse(guard.allows(alice, 99));
+
+        Authentication bob = signedIn(clinicUser("bob"));
+        assertTrue(guard.allows(bob, 2));
+        assertFalse(guard.allows(bob, 1));
     }
 
     @Test
-    @WithMockUser(username = "alice", roles = "PATIENT")
     void patientPrincipalThatIsNotAClinicUserIsRefused() {
-        assertFalse(guard.allows(current(), 1));
-        assertFalse(guard.allows(current(), 2));
+        UserDetails plain = User.withUsername("alice").password("unused").roles("PATIENT").build();
+        Authentication auth = signedIn(plain);
+        assertFalse(guard.allows(auth, 1));
+        assertFalse(guard.allows(auth, 2));
     }
 
-    private void assertStaffAllowedForAnyId() {
-        assertTrue(guard.allows(current(), 1));
-        assertTrue(guard.allows(current(), 2));
-        assertTrue(guard.allows(current(), 99));
+    private void assertAllowedForAnyId(Authentication auth) {
+        assertTrue(guard.allows(auth, 1));
+        assertTrue(guard.allows(auth, 2));
+        assertTrue(guard.allows(auth, 99));
     }
 
-    private static Authentication current() {
-        return SecurityContextHolder.getContext().getAuthentication();
+    private static Authentication staff(String authority) {
+        return new TestingAuthenticationToken("staff", null, authority);
+    }
+
+    private static ClinicUser clinicUser(String username) {
+        return new ClinicUser(DemoUsers.all().stream()
+                .filter(u -> u.username().equals(username))
+                .findFirst()
+                .orElseThrow());
+    }
+
+    private static Authentication signedIn(UserDetails user) {
+        return UsernamePasswordAuthenticationToken.authenticated(user, null, user.getAuthorities());
     }
 }

@@ -1,7 +1,11 @@
 package edu.rit.swen755.auth.audit;
 
+import edu.rit.swen755.auth.TestFixtures.AuditBaseline;
+import edu.rit.swen755.auth.access.ApiAccessDeniedHandler;
 import edu.rit.swen755.auth.authn.ClinicUser;
 import edu.rit.swen755.auth.authn.DemoUserDetailsService;
+import jakarta.servlet.http.HttpServletResponse;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +22,7 @@ import org.springframework.security.authorization.AuthorityAuthorizationDecision
 import org.springframework.security.authorization.event.AuthorizationDeniedEvent;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -26,19 +31,25 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import java.time.Instant;
 import java.util.List;
 
-import static edu.rit.swen755.auth.ContractSmokeTest.password;
+import static edu.rit.swen755.auth.TestFixtures.after;
+import static edu.rit.swen755.auth.TestFixtures.baseline;
+import static edu.rit.swen755.auth.TestFixtures.password;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Acceptance tests for the Audit tactic (slice 3).
  *
- * <p>The context, and with it the one {@link AuditLog}, is shared with the other test classes, so
- * every test takes a baseline index first and only looks at entries recorded after it.
+ * <p>The 403 handler is replaced by a mock that only sets the status, so the real-chain test
+ * depends on slice 3's code alone. Every test takes a baseline first and only looks at entries
+ * recorded after it.
  */
 @Disabled("TODO(slice 3: Chase) — enable when implementing")
 @SpringBootTest
@@ -57,9 +68,20 @@ class AuditTest {
     @Autowired
     private MockMvc mvc;
 
+    @MockitoBean
+    private ApiAccessDeniedHandler deniedHandler;
+
+    @BeforeEach
+    void deniedHandlerAnswers403() throws Exception {
+        doAnswer(invocation -> {
+            invocation.getArgument(1, HttpServletResponse.class).setStatus(HttpServletResponse.SC_FORBIDDEN);
+            return null;
+        }).when(deniedHandler).handle(any(), any(), any());
+    }
+
     @Test
     void recordsTheThreeKindsOfSecurityEvent() {
-        int baseline = auditLog.entries().size();
+        AuditBaseline before = baseline(auditLog);
         RequestAttributes previous = RequestContextHolder.getRequestAttributes();
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/patients/2/record");
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
@@ -80,7 +102,7 @@ class AuditTest {
             RequestContextHolder.setRequestAttributes(previous);
         }
 
-        List<AuditEntry> recorded = after(baseline);
+        List<AuditEntry> recorded = after(auditLog, before);
         AuditEntry failure = find(recorded, AuditKind.AUTHN_FAILURE, "mallory");
         assertEquals("BadCredentialsException", failure.detail());
         assertEquals("GET", failure.method());
@@ -99,13 +121,12 @@ class AuditTest {
 
     @Test
     void aForbiddenRequestThroughTheRealChainLogsSuccessThenDenial() throws Exception {
-        int baseline = auditLog.entries().size();
+        AuditBaseline before = baseline(auditLog);
 
-        // The response status is slice 2's concern and is asserted in AccessMatrixTest; until
-        // slice 2 lands, its 403 handler is still a Step 0 stub, which is tolerated here.
-        performToleratingStubs("/api/admin/users", "dr.chen");
+        mvc.perform(get("/api/admin/users").with(httpBasic("dr.chen", password("dr.chen"))))
+                .andExpect(status().isForbidden());
 
-        List<AuditEntry> recorded = after(baseline).stream()
+        List<AuditEntry> recorded = after(auditLog, before).stream()
                 .filter(e -> "dr.chen".equals(e.username()) && "/api/admin/users".equals(e.path()))
                 .toList();
         int success = indexOf(recorded, AuditKind.AUTHN_SUCCESS);
@@ -120,25 +141,6 @@ class AuditTest {
         List<AuditEntry> snapshot = auditLog.entries();
         assertThrows(UnsupportedOperationException.class, () -> snapshot.add(
                 new AuditEntry(Instant.now(), AuditKind.AUTHN_SUCCESS, "x", "-", "-", "-")));
-    }
-
-    private void performToleratingStubs(String path, String username) throws Exception {
-        try {
-            mvc.perform(get(path).with(httpBasic(username, password(username))));
-        } catch (Exception e) {
-            Throwable cause = e;
-            while (cause != null && !(cause instanceof UnsupportedOperationException)) {
-                cause = cause.getCause();
-            }
-            if (cause == null || cause.getMessage() == null || !cause.getMessage().startsWith("TODO(")) {
-                throw e;
-            }
-        }
-    }
-
-    private List<AuditEntry> after(int baseline) {
-        List<AuditEntry> all = auditLog.entries();
-        return all.subList(baseline, all.size());
     }
 
     private static AuditEntry find(List<AuditEntry> entries, AuditKind kind, String username) {

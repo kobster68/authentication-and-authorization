@@ -28,7 +28,8 @@ VITALS_JSON='{"systolic":120,"diastolic":80,"pulse":72}'
 PRESCRIPTION_JSON='{"drug":"amoxicillin","dose":"500mg"}'
 
 # The demo passwords. They are published in the README on purpose (evaluation only); the server
-# stores only their bcrypt hashes.
+# stores only their bcrypt hashes. The Java tests keep the same table in
+# src/test/java/edu/rit/swen755/auth/TestFixtures.java (PASSWORDS); keep the two in step.
 password_for() {
   case "$1" in
     admin) echo "admin-pass" ;;

@@ -7,6 +7,9 @@ import edu.rit.swen755.auth.access.Requirement.AnyRole;
 import edu.rit.swen755.auth.access.Requirement.Authenticated;
 import edu.rit.swen755.auth.access.Requirement.PermitAll;
 import edu.rit.swen755.auth.access.Role;
+import edu.rit.swen755.auth.audit.AuditEntry;
+import edu.rit.swen755.auth.audit.AuditKind;
+import edu.rit.swen755.auth.audit.InMemoryAuditLog;
 import edu.rit.swen755.auth.authn.ClinicUser;
 import edu.rit.swen755.auth.authn.DemoUser;
 import edu.rit.swen755.auth.authn.DemoUserDetailsService;
@@ -25,15 +28,17 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.OptionalLong;
 import java.util.Set;
 
+import static edu.rit.swen755.auth.TestFixtures.password;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -47,33 +52,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-public class ContractSmokeTest {
-
-    /**
-     * The demo passwords, by username. This is the one place in the test code where they are
-     * spelled out; other test classes read them from here. They are published in the README on
-     * purpose (evaluation only) and never appear under {@code src/main}.
-     */
-    public static final Map<String, String> PASSWORDS = Map.of(
-            "admin", "admin-pass",
-            "dr.chen", "chen-pass",
-            "nurse.patel", "patel-pass",
-            "alice", "alice-pass",
-            "bob", "bob-pass");
-
-    /**
-     * The demo password of a seeded user.
-     *
-     * @param username a seeded username
-     * @return its password
-     */
-    public static String password(String username) {
-        String password = PASSWORDS.get(username);
-        if (password == null) {
-            throw new IllegalArgumentException("not a seeded user: " + username);
-        }
-        return password;
-    }
+class ContractSmokeTest {
 
     @Autowired
     private MockMvc mvc;
@@ -163,5 +142,29 @@ public class ContractSmokeTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"clinic\":\"SWEN-755 Clinic\",\"status\":\"open\"}", JsonCompareMode.STRICT));
+    }
+
+    @Test
+    void demoMatrixParsesToEveryRow() {
+        // 6 actors x 12 services, plus 2 bad-credential users x 4 URLs.
+        List<TestFixtures.MatrixRow> rows = TestFixtures.demoMatrix();
+        assertEquals(80, rows.size(), "scripts/demo-matrix.txt should have 80 rows (commented or not)");
+        assertTrue(rows.stream().allMatch(r -> !r.needs().isEmpty()));
+        assertTrue(rows.stream().anyMatch(r -> r.enabled() && r.expected() == 200
+                        && r.path().equals("/api/public/info") && r.username() == null),
+                "the anonymous public row must always be enabled");
+    }
+
+    @Test
+    void auditLogKeepsTheNewest1000EntriesOldestFirst() {
+        InMemoryAuditLog log = new InMemoryAuditLog();
+        for (int i = 0; i < 1005; i++) {
+            log.record(new AuditEntry(Instant.EPOCH, AuditKind.AUTHN_SUCCESS, "user" + i, "GET", "/api/me", "-"));
+        }
+        List<AuditEntry> entries = log.entries();
+        assertEquals(1000, entries.size());
+        assertEquals("user5", entries.get(0).username());
+        assertEquals("user1004", entries.get(999).username());
+        assertThrows(UnsupportedOperationException.class, () -> entries.add(entries.get(0)));
     }
 }

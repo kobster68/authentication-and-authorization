@@ -18,6 +18,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 
+import static edu.rit.swen755.auth.TestFixtures.PRESCRIPTION;
+import static edu.rit.swen755.auth.TestFixtures.VITALS;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.matchesPattern;
@@ -44,9 +46,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc(addFilters = false)
 class ServicesTest {
-
-    private static final String VITALS = "{\"systolic\":120,\"diastolic\":80,\"pulse\":72}";
-    private static final String PRESCRIPTION = "{\"drug\":\"amoxicillin\",\"dose\":\"500mg\"}";
 
     @Autowired
     private MockMvc mvc;

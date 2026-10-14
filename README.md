@@ -85,6 +85,9 @@ secret store. A real deployment would keep users outside the code and force a pa
 
 ## Services (URL table)
 
+<!-- Keep every row in the form `| <#> | <METHOD> | `<pattern>` | ... |`, with the pattern exactly as in
+     AccessRules: DocsConsistencyTest looks for `| <METHOD> | `<pattern>` |` for each service. -->
+
 "NURSE+" means NURSE or any role above it in the hierarchy (DOCTOR, ADMIN). The own-record rule
 means a PATIENT may call the service only for their own patient id.
 
@@ -105,6 +108,9 @@ means a PATIENT may call the service only for their own patient id.
 
 Expected status for every user against every service. Patient ids: 1 is alice, 2 is bob, 99 does
 not exist. "anon" is a request without credentials.
+
+The source of this matrix is `scripts/demo-matrix.txt`: `scripts/demo.sh` and `AccessMatrixTest`
+both read it. This table must mirror that file; change the file first.
 
 | Service | anon | admin | dr.chen | nurse.patel | alice (P1) | bob (P2) |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -137,7 +143,7 @@ the public one included.
 
 Every authenticated request is recorded in the audit log (HTTP Basic sends credentials on each
 request, so there is no separate "login"), together with every failed authentication and every
-denial.
+denial. The log is held in memory and keeps the newest 1000 entries.
 
 <!-- TODO(slice 4: Mallikarjuna): refine the audit explanation and add an example entry. -->
 

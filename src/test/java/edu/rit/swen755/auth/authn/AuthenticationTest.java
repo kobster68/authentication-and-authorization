@@ -14,7 +14,7 @@ import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static edu.rit.swen755.auth.ContractSmokeTest.password;
+import static edu.rit.swen755.auth.TestFixtures.password;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;

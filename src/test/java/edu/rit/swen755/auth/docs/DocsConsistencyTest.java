@@ -42,11 +42,17 @@ class DocsConsistencyTest {
         SECTION_HEADINGS.put("09-verification.md", "# 9. Verification");
     }
 
+    /**
+     * Each service must appear as its own row of the README's URL table, in the form
+     * {@code | <METHOD> | `<pattern>` |}. Matching the whole cell (not a bare substring) means a
+     * missing {@code GET /api/patients} row cannot be hidden by {@code /api/patients/{id}/record}.
+     */
     @Test
-    void readmeListsEveryUrlPattern() throws IOException {
+    void readmeUrlTableHasARowForEveryService() throws IOException {
         String readme = Files.readString(README);
         for (AccessRule rule : AccessRules.all()) {
-            assertTrue(readme.contains(rule.pattern()), "README is missing the URL " + rule.pattern());
+            String cells = "| " + rule.method().name() + " | `" + rule.pattern() + "` |";
+            assertTrue(readme.contains(cells), "README URL table has no row containing " + cells);
         }
     }
 
