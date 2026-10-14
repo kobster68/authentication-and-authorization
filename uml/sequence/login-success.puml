@@ -1,0 +1,30 @@
+@startuml login-success
+title Login success: nurse.patel calls GET /api/me with HTTP Basic\n(stateless: no session is created, so every request repeats this whole exchange)
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor Client
+participant BasicAuthenticationFilter
+participant ProviderManager
+participant DaoAuthenticationProvider
+participant DemoUserDetailsService
+participant PasswordEncoder
+participant AuthenticationEventPublisher
+participant AuthorizationFilter
+participant MeController
+
+Client -> BasicAuthenticationFilter : GET /api/me\nAuthorization: Basic base64(nurse.patel:patel-pass)
+BasicAuthenticationFilter -> ProviderManager : authenticate(token: "nurse.patel", "patel-pass")
+ProviderManager -> DaoAuthenticationProvider : authenticate(token)
+DaoAuthenticationProvider -> DemoUserDetailsService : loadUserByUsername("nurse.patel")
+DemoUserDetailsService --> DaoAuthenticationProvider : new ClinicUser(ROLE_NURSE, "{bcrypt}$2a$10$...")
+DaoAuthenticationProvider -> PasswordEncoder : matches("patel-pass", "{bcrypt}$2a$10$...")\nDelegatingPasswordEncoder: the {bcrypt} prefix selects BCrypt (cost 10, about 70 ms)
+PasswordEncoder --> DaoAuthenticationProvider : true
+DaoAuthenticationProvider --> ProviderManager : authenticated token (principal: ClinicUser)
+ProviderManager -> AuthenticationEventPublisher : publish AuthenticationSuccessEvent\n(delivered to SecurityEventListener, the audit trail)
+ProviderManager --> BasicAuthenticationFilter : authenticated token
+BasicAuthenticationFilter -> AuthorizationFilter : chain.doFilter(...)\nSecurityContext = nurse.patel, for this request only
+AuthorizationFilter -> MeController : rule "authenticated" is met: me(...)
+MeController --> Client : 200 OK {"username":"nurse.patel","role":"NURSE",...}
+
+@enduml
