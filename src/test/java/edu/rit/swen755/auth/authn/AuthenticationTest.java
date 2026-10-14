@@ -1,6 +1,5 @@
 package edu.rit.swen755.auth.authn;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -31,7 +30,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * the indistinguishability of a wrong password and an unknown user, and the publication of the
  * authentication events the audit listener consumes. Green with slice 1 and Step 0 alone.
  */
-@Disabled("TODO(slice 1: Godson) — enable when implementing")
 @SpringBootTest
 @AutoConfigureMockMvc
 @RecordApplicationEvents
