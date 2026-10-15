@@ -6,7 +6,6 @@ import edu.rit.swen755.auth.authn.ClinicUser;
 import edu.rit.swen755.auth.authn.DemoUserDetailsService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -51,7 +50,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * depends on slice 3's code alone. Every test takes a baseline first and only looks at entries
  * recorded after it.
  */
-@Disabled("TODO(slice 3: Chase) — enable when implementing")
 @SpringBootTest
 @AutoConfigureMockMvc
 class AuditTest {
@@ -111,12 +109,48 @@ class AuditTest {
         AuditEntry success = find(recorded, AuditKind.AUTHN_SUCCESS, "alice");
         assertEquals("GET", success.method());
         assertEquals("/api/patients/2/record", success.path());
+        assertEquals("-", success.detail());
 
         AuditEntry denied = find(recorded, AuditKind.AUTHZ_DENIED, "anonymous");
         assertEquals("GET", denied.method());
         assertEquals("/api/patients/2/record", denied.path());
         assertTrue(denied.detail().contains("ROLE_ADMIN"), "denial detail should name the required role: " + denied.detail());
         assertTrue(recorded.stream().allMatch(e -> e.at() != null && !e.at().isAfter(Instant.now())));
+    }
+
+    @Test
+    void bareDenialsRecordAuthenticatedAndDenyAllDetails() {
+        AuditBaseline before = baseline(auditLog);
+        ClinicUser alice = (ClinicUser) users.loadUserByUsername("alice");
+        Authentication aliceAuthentication = UsernamePasswordAuthenticationToken.authenticated(
+                alice, null, alice.getAuthorities());
+        Authentication anonymous = new AnonymousAuthenticationToken("key", "anonymousUser",
+                AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS"));
+        RequestAttributes previous = RequestContextHolder.getRequestAttributes();
+        try {
+            MockHttpServletRequest meRequest = new MockHttpServletRequest("GET", "/api/me");
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(meRequest));
+            publisher.publishEvent(new AuthorizationDeniedEvent<>(() -> aliceAuthentication, meRequest,
+                    new org.springframework.security.authorization.AuthorizationDecision(false)));
+
+            MockHttpServletRequest unknownRequest = new MockHttpServletRequest("POST", "/api/nothing");
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(unknownRequest));
+            publisher.publishEvent(new AuthorizationDeniedEvent<>(() -> anonymous, unknownRequest,
+                    new org.springframework.security.authorization.AuthorizationDecision(false)));
+        } finally {
+            RequestContextHolder.setRequestAttributes(previous);
+        }
+
+        List<AuditEntry> recorded = after(auditLog, before);
+        AuditEntry authenticatedDenial = find(recorded, AuditKind.AUTHZ_DENIED, "alice");
+        assertEquals("authenticated", authenticatedDenial.detail());
+        assertEquals("GET", authenticatedDenial.method());
+        assertEquals("/api/me", authenticatedDenial.path());
+
+        AuditEntry defaultDenial = find(recorded, AuditKind.AUTHZ_DENIED, "anonymous");
+        assertEquals("denyAll", defaultDenial.detail());
+        assertEquals("POST", defaultDenial.method());
+        assertEquals("/api/nothing", defaultDenial.path());
     }
 
     @Test

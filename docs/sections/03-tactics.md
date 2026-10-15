@@ -24,4 +24,4 @@ What belongs in this section:
 
 ## Audit
 
-<!-- Slice 3 (Chase) writes this subsection. -->
+The `SecurityEventListener` applies the Audit tactic (SAiP 4th ed., p. 176) by recording each authentication success and failure and each authorization denial in the bounded, in-memory `AuditLog`, and by writing the same event to the application log at INFO. Each entry includes the time, username, event kind, HTTP method and request path, plus a failure exception name or denial reason. With stateless HTTP Basic, authentication occurs independently on each request, so each authenticated request produces an `AUTHN_SUCCESS` entry rather than a one-time login entry.

@@ -1,10 +1,21 @@
 package edu.rit.swen755.auth.audit;
 
+import jakarta.servlet.http.HttpServletRequest;
+import org.aopalliance.intercept.MethodInvocation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.security.authorization.AuthorityAuthorizationDecision;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.authentication.event.AbstractAuthenticationFailureEvent;
 import org.springframework.security.authentication.event.AuthenticationSuccessEvent;
 import org.springframework.security.authorization.event.AuthorizationDeniedEvent;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import java.time.Instant;
+import java.util.Comparator;
+import java.util.stream.Collectors;
 
 /**
  * Turns Spring Security's authentication and authorization events into audit entries, so no
@@ -28,6 +39,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class SecurityEventListener {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(SecurityEventListener.class);
+
     private final AuditLog log;
 
     /**
@@ -45,7 +58,7 @@ public class SecurityEventListener {
      */
     @EventListener
     public void onSuccess(AuthenticationSuccessEvent event) {
-        // Step 0: intentionally empty; slice 3 records the entry.
+        record(AuditKind.AUTHN_SUCCESS, event.getAuthentication().getName(), "-");
     }
 
     /**
@@ -56,7 +69,8 @@ public class SecurityEventListener {
      */
     @EventListener
     public void onFailure(AbstractAuthenticationFailureEvent event) {
-        // Step 0: intentionally empty; slice 3 records the entry.
+        record(AuditKind.AUTHN_FAILURE, event.getAuthentication().getName(),
+            event.getException().getClass().getSimpleName());
     }
 
     /**
@@ -69,6 +83,39 @@ public class SecurityEventListener {
      */
     @EventListener
     public void onDenied(AuthorizationDeniedEvent<?> event) {
-        // Step 0: intentionally empty; slice 3 records the entry.
+        String username = event.getAuthentication().get().getName();
+        String detail;
+        if (event.getObject() instanceof MethodInvocation invocation) {
+            detail = invocation.getMethod().getName();
+        } else if (event.getAuthorizationResult() instanceof AuthorityAuthorizationDecision authorityDecision) {
+            detail = authorityDecision.getAuthorities().stream()
+                    .map(authority -> authority.getAuthority())
+                    .filter(authority -> authority.startsWith("ROLE_"))
+                    .sorted(Comparator.naturalOrder())
+                    .collect(Collectors.joining(","));
+        } else {
+            String path = requestDetails().path;
+            detail = "/api/me".equals(path) ? "authenticated" : "denyAll";
+        }
+        record(AuditKind.AUTHZ_DENIED, username, detail);
+    }
+
+    private void record(AuditKind kind, String username, String detail) {
+        RequestDetails request = requestDetails();
+        String recordedUsername = "anonymousUser".equals(username) ? "anonymous" : username;
+        log.record(new AuditEntry(Instant.now(), kind, recordedUsername, request.method, request.path, detail));
+        LOGGER.info("SECURITY_AUDIT kind={} user={} method={} path={} detail={}", kind, recordedUsername,
+                request.method, request.path, detail);
+    }
+
+    private static RequestDetails requestDetails() {
+        if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
+            HttpServletRequest request = attributes.getRequest();
+            return new RequestDetails(request.getMethod(), request.getRequestURI());
+        }
+        return new RequestDetails("-", "-");
+    }
+
+    private record RequestDetails(String method, String path) {
     }
 }
