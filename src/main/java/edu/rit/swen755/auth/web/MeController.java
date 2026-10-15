@@ -1,5 +1,6 @@
 package edu.rit.swen755.auth.web;
 
+import edu.rit.swen755.auth.authn.ClinicUser;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.CurrentSecurityContext;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,6 +40,16 @@ public class MeController {
      */
     @GetMapping("/api/me")
     public Me me(@CurrentSecurityContext(expression = "authentication") Authentication authentication) {
-        throw new UnsupportedOperationException("TODO(slice 3: Chase)");
+        if (authentication.getPrincipal() instanceof ClinicUser user) {
+            Long patientId = user.patientId().isPresent() ? user.patientId().getAsLong() : null;
+            return new Me(user.getUsername(), user.role().name(), patientId);
+        }
+        String role = authentication.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .filter(authority -> authority.startsWith("ROLE_"))
+                .map(authority -> authority.substring("ROLE_".length()))
+                .findFirst()
+                .orElse(null);
+        return new Me(authentication.getName(), role, null);
     }
 }

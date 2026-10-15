@@ -2,6 +2,7 @@ package edu.rit.swen755.auth.web;
 
 import edu.rit.swen755.auth.audit.AuditEntry;
 import edu.rit.swen755.auth.audit.AuditLog;
+import edu.rit.swen755.auth.authn.DemoUsers;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -40,7 +41,9 @@ public class AdminController {
      */
     @GetMapping("/api/admin/users")
     public List<UserSummary> users() {
-        throw new UnsupportedOperationException("TODO(slice 3: Chase)");
+        return DemoUsers.all().stream()
+            .map(user -> new UserSummary(user.username(), user.role().name()))
+            .toList();
     }
 
     /**
@@ -51,6 +54,6 @@ public class AdminController {
      */
     @GetMapping("/api/admin/audit")
     public List<AuditEntry> audit() {
-        throw new UnsupportedOperationException("TODO(slice 3: Chase)");
+        return auditLog.entries();
     }
 }
