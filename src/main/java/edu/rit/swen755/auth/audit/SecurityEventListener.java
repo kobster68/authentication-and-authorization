@@ -87,7 +87,7 @@ public class SecurityEventListener {
         String detail;
         if (event.getObject() instanceof MethodInvocation invocation) {
             detail = invocation.getMethod().getName();
-        } else if (event.getAuthorizationDecision() instanceof AuthorityAuthorizationDecision authorityDecision) {
+        } else if (event.getAuthorizationResult() instanceof AuthorityAuthorizationDecision authorityDecision) {
             detail = authorityDecision.getAuthorities().stream()
                     .map(authority -> authority.getAuthority())
                     .filter(authority -> authority.startsWith("ROLE_"))
