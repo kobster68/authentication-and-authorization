@@ -86,7 +86,11 @@ before being told what they may not do.
 
 ## Authorized request and forbidden request
 
-<!-- Slice 2 (Kobe) writes this subsection. -->
+These diagrams follow authenticated requests through the two authorization checks: the URL's
+role requirement in `AuthorizationFilter`, followed by the patient ownership check through
+`@PreAuthorize` and `OwnRecordGuard`. The first request passes both checks; the second passes
+the role check but fails ownership and receives 403. Each diagram's PlantUML source and UTXT
+rendering are stored beside its PNG under `uml/sequence/`.
 
 ### Authorized request
 
