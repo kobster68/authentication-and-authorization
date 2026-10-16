@@ -5,7 +5,6 @@ import edu.rit.swen755.auth.authn.DemoUserDetailsService;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aopalliance.intercept.MethodInvocation;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -45,7 +44,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * are asserted in {@code AccessMatrixTest}; the two hierarchy and error-dispatch checks below ask
  * the URL authorization manager directly for the same reason. Green with slice 2 and Step 0 alone.
  */
-@Disabled("TODO(slice 2: Kobe) — enable when implementing")
 @SpringBootTest
 @AutoConfigureMockMvc
 @RecordApplicationEvents
@@ -181,5 +179,33 @@ class AuthorizationTest {
                 .findFirst()
                 .orElseThrow()
                 .getAuthorizationManager();
+    }
+
+    @Test
+    void errorDispatchForAMissingResourceDoesNotPublishADenial() throws Exception {
+        mvc.perform(get("/missing-resource").with(request -> {
+                    request.setDispatcherType(DispatcherType.ERROR);
+                    return request;
+                })
+                        .requestAttr("jakarta.servlet.error.status_code", 404))
+                .andExpect(status().isNotFound());
+        assertFalse(events.stream(AuthorizationDeniedEvent.class).findAny().isPresent());
+    }
+
+    @Test
+    void wrongHttpMethodIsDeniedEvenToAdmin() {
+        ClinicUser admin = (ClinicUser) users.loadUserByUsername("admin");
+        Authentication auth = UsernamePasswordAuthenticationToken.authenticated(admin, null, admin.getAuthorities());
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/admin/users");
+        AuthorizationResult result = urlAuthorization().authorize(() -> auth, request);
+        assertTrue(result != null && !result.isGranted());
+    }
+
+    @Test
+    void patientCannotProbeWhetherAnotherPatientExists() throws Exception {
+        mvc.perform(get("/api/patients/99/record").with(httpBasic("alice", password("alice"))))
+                .andExpect(status().isForbidden());
+        assertTrue(events.stream(AuthorizationDeniedEvent.class)
+                .anyMatch(e -> e.getObject() instanceof MethodInvocation));
     }
 }
