@@ -1,6 +1,6 @@
 package edu.rit.swen755.auth.access;
 
-// import edu.rit.swen755.auth.web.ApiError;
+import edu.rit.swen755.auth.web.ApiError;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -42,8 +42,6 @@ public class ApiAccessDeniedHandler implements AccessDeniedHandler {
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response, AccessDeniedException denied)
             throws IOException, ServletException {
-        // Enable once slice 1's ApiError is available on this branch.
-        // ApiError.write(response, json, HttpServletResponse.SC_FORBIDDEN, "Forbidden", request);
-        throw new UnsupportedOperationException("TODO(slice 2: Kobe)");
+        ApiError.write(response, json, HttpServletResponse.SC_FORBIDDEN, "Forbidden", request);
     }
 }
