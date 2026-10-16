@@ -1,5 +1,6 @@
 package edu.rit.swen755.auth.access;
 
+import edu.rit.swen755.auth.authn.ClinicUser;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
@@ -34,6 +35,13 @@ public class OwnRecordGuard {
      * @return whether access is allowed
      */
     public boolean allows(Authentication auth, long patientId) {
-        throw new UnsupportedOperationException("TODO(slice 2: Kobe)");
+        boolean patient = auth.getAuthorities().stream()
+                .anyMatch(authority -> Role.PATIENT.authority().equals(authority.getAuthority()));
+        if (!patient) {
+            return true;
+        }
+        return auth.getPrincipal() instanceof ClinicUser user
+                && user.patientId().isPresent()
+                && user.patientId().getAsLong() == patientId;
     }
 }
