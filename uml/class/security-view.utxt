@@ -1,0 +1,47 @@
+Security view: the filter chain and the config, authn, access and audit packages
+(text outline of security-view.puml; PlantUML renders class diagrams as text only with Graphviz)
+
+Spring Security filter chain (Intercepting Filter), in request order
+  BasicAuthenticationFilter ──authenticate──> DaoAuthenticationProvider
+      DaoAuthenticationProvider ──loadUserByUsername──> authn.DemoUserDetailsService
+      bad credentials ──> authn.ApiAuthenticationEntryPoint (401)
+  ExceptionTranslationFilter
+      anonymous caller      ──> authn.ApiAuthenticationEntryPoint (401)
+      authenticated caller  ──> access.ApiAccessDeniedHandler     (403)
+  AuthorizationFilter       rules built by access.AccessPolicy
+  Method security (@PreAuthorize) ──@ownRecord.allows──> access.OwnRecordGuard
+      guards web.PatientController.record / appointments
+
+config
+  SecurityConfig «@Configuration»
+      api(http, policy, entryPoint, denied) : SecurityFilterChain
+      roleHierarchy() : RoleHierarchy            ADMIN > DOCTOR > NURSE
+      passwordEncoder() : PasswordEncoder        delegating, {bcrypt}
+      authorizationEventPublisher(publisher)
+      uses ──> AccessPolicy, ApiAuthenticationEntryPoint, ApiAccessDeniedHandler
+
+authn
+  DemoUserDetailsService «UserDetailsService» ──> DemoUsers ◇── 5 DemoUser «record»
+      creates ──> ClinicUser (extends User; role, patientId) ──> access.Role
+  ApiAuthenticationEntryPoint «AuthenticationEntryPoint» ──> web.ApiError
+
+access
+  AccessPolicy ──> AccessRules ◇── 9 AccessRule «record»
+      AccessRule ──> Requirement «sealed»
+          ◁── PermitAll, Authenticated, AnyRole(roles ──> Role)
+  Role {ADMIN, DOCTOR, NURSE, PATIENT}
+  OwnRecordGuard «bean "ownRecord"» ── reads patientId ──> authn.ClinicUser
+  ApiAccessDeniedHandler «AccessDeniedHandler» ──> web.ApiError
+
+audit
+  SecurityEventListener ──record──> AuditLog ◁── InMemoryAuditLog
+      receives AuthenticationSuccessEvent, AbstractAuthenticationFailureEvent
+               (from DaoAuthenticationProvider / ProviderManager)
+      receives AuthorizationDeniedEvent
+               (from AuthorizationFilter and method security)
+  AuditLog ◇── AuditEntry «record» ──> AuditKind {AUTHN_SUCCESS, AUTHN_FAILURE, AUTHZ_DENIED}
+
+web
+  AdminController ──entries──> audit.AuditLog
+  PatientController (guarded by method security)
+  ApiError «record»

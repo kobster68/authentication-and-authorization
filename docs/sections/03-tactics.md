@@ -12,7 +12,36 @@ What belongs in this section:
 
 # 3. Tactics and where they live
 
-<!-- TODO(slice 4: Mallikarjuna): framing paragraphs. -->
+All the security in the portal lives in one place: a single Spring Security filter chain, declared
+in `SecurityConfig`, that every HTTP request crosses before any controller runs. This is the
+Intercepting Filter pattern that SAiP describes (p. 194). The controllers contain no security code
+of their own, apart from one `@PreAuthorize` annotation on each of the two patient read services,
+and they cannot be reached except through the chain. A new controller therefore cannot skip
+authentication or authorization by accident: if nobody adds a row for it to the access table, the
+chain's last rule denies it.
+
+The filters that matter here run in this order for each request:
+
+1. `BasicAuthenticationFilter` reads the `Authorization` header and authenticates the caller
+   (Identify Actors, Authenticate Actors).
+2. `ExceptionTranslationFilter` turns any later security exception into a response: 401 through
+   `ApiAuthenticationEntryPoint` for an anonymous caller, 403 through `ApiAccessDeniedHandler` for an
+   authenticated one.
+3. `AuthorizationFilter` applies the URL rules generated from `AccessRules`, including the final
+   default deny (Authorize Actors per role, Limit Access).
+4. Method security (`@PreAuthorize`) runs `OwnRecordGuard` just before the two patient read methods
+   (Authorize Actors per actor).
+
+Spring Security publishes an event at each decision point, and `SecurityEventListener` turns those
+events into audit entries (Audit). Nothing in the request path calls the audit log directly.
+
+An intermediary has a cost (SAiP, p. 179): every request pays for each filter it passes. The
+largest part of that cost here is not the filters themselves but the bcrypt comparison that
+stateless HTTP Basic repeats on every authenticated request, about 60 to 80 ms on a development
+laptop against a few milliseconds for an anonymous call. We accept that cost in exchange for a
+single, auditable place where security decisions are made (Section 8, decisions D3 and D5).
+
+The subsections below were written by the slice that built each tactic.
 
 ## Identify Actors and Authenticate Actors
 

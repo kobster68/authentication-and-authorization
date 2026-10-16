@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * tables cannot drift from the code, every section file exists with its heading, and no TODO
  * marker is left. Maven runs tests from the project root, so the paths are relative to it.
  */
-@Disabled("TODO(slice 4: Mallikarjuna) — enable when implementing")
 class DocsConsistencyTest {
 
     private static final Path README = Path.of("README.md");
