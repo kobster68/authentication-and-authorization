@@ -1,0 +1,30 @@
+@startuml authorized-request
+title Authorized request: nurse reads patient 1's record
+skinparam sequenceMessageAlign center
+actor Nurse
+participant BasicAuthenticationFilter as Basic
+participant ExceptionTranslationFilter as Exceptions
+participant AuthorizationFilter as URL
+participant "Method security\n@PreAuthorize" as Method
+participant OwnRecordGuard as Guard
+participant PatientController as Controller
+participant ClinicRepository as Repository
+Nurse -> Basic : GET /api/patients/1/record\nvalid Basic credentials
+Basic -> Basic : authenticate and set SecurityContext
+Basic -> Exceptions : chain.doFilter
+Exceptions -> URL : chain.doFilter
+note right of URL
+  AccessPolicy generates rules from AccessRules.
+  PATIENT or NURSE; hierarchy admits DOCTOR and ADMIN.
+end note
+URL -> Method : role rule passes
+Method -> Guard : allows(authentication, 1)
+Guard --> Method : true (caller is staff)
+Method -> Controller : record(1)
+Controller -> Repository : record(1)
+Repository --> Controller : MedicalRecord
+Controller --> Nurse : 200 OK + record
+note over Controller, Repository
+  Completed service behavior requires slice 3.
+end note
+@enduml

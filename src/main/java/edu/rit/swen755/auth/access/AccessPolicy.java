@@ -1,7 +1,6 @@
 package edu.rit.swen755.auth.access;
 
 import jakarta.servlet.DispatcherType;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer;
 import org.springframework.stereotype.Component;
@@ -34,17 +33,20 @@ public class AccessPolicy {
      *   <li>finally {@code anyRequest().denyAll()} (default deny).</li>
      * </ol>
      *
-     * <p>Step 0 body (a no-op policy that keeps every other slice's request path working): ERROR
-     * dispatch permitted, {@code GET /api/public/info} permitted, everything else denied. Slice 2
-     * replaces this body with the table-driven rules described above.
-     *
      * @param registry the registry passed in by {@code HttpSecurity.authorizeHttpRequests}
      */
     public void configure(
             AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry registry) {
-        registry
-                .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/public/info").permitAll()
-                .anyRequest().denyAll();
+        registry.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll();
+        for (AccessRule rule : AccessRules.all()) {
+            var matcher = registry.requestMatchers(rule.method(), rule.pattern());
+            switch (rule.requirement()) {
+                case Requirement.PermitAll ignored -> matcher.permitAll();
+                case Requirement.Authenticated ignored -> matcher.authenticated();
+                case Requirement.AnyRole requirement -> matcher.hasAnyRole(
+                        requirement.roles().stream().map(Role::name).sorted().toArray(String[]::new));
+            }
+        }
+        registry.anyRequest().denyAll();
     }
 }

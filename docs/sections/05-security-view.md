@@ -10,6 +10,20 @@ What belongs in this section:
 
 <!-- TODO(slice 4: Mallikarjuna): write this section. -->
 
+<!-- Access-package catalog paragraph from Kobe, for Mallikarjuna to incorporate. -->
+
+**`access` package (Authorize Actors, Limit Access).** `AccessRules` holds the ordered service
+table as immutable `AccessRule` records. Each row supplies its HTTP method, path pattern,
+`Requirement` (`PermitAll`, `Authenticated`, or `AnyRole`), and own-record marker. `Role` names
+the four actor types; the staff hierarchy is supplied by `config.SecurityConfig`. `AccessPolicy`
+turns the table into URL authorization rules, permits ERROR dispatch first, and denies unlisted
+requests last. `OwnRecordGuard`, named `ownRecord`, supplies the per-actor check called by the
+two patient read methods' `@PreAuthorize` annotations: patients must match their principal's
+patient ID, while staff already admitted by URL authorization may read any patient.
+`ApiAccessDeniedHandler` writes a consistent JSON 403 response using `web.ApiError` for an
+authenticated caller who fails either check. The configured Spring authorization event publisher
+reports both kinds of denial for the audit listener.
+
 <!-- Element catalog paragraph for the authn package, from Godson (slice 1). -->
 
 **`authn` package (Identify Actors, Authenticate Actors).** These classes are the application's

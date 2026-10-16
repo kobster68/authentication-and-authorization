@@ -2,13 +2,14 @@ package edu.rit.swen755.auth.access;
 
 import edu.rit.swen755.auth.authn.ClinicUser;
 import edu.rit.swen755.auth.authn.DemoUsers;
-import org.junit.jupiter.api.Disabled;
+import edu.rit.swen755.auth.authn.DemoUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
+import java.util.OptionalLong;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -17,7 +18,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Acceptance tests for the per-actor own-record check (slice 2): plain unit tests of the guard,
  * no Spring context.
  */
-@Disabled("TODO(slice 2: Kobe) — enable when implementing")
 class OwnRecordGuardTest {
 
     private final OwnRecordGuard guard = new OwnRecordGuard();
@@ -61,6 +61,19 @@ class OwnRecordGuardTest {
         assertTrue(guard.allows(auth, 1));
         assertTrue(guard.allows(auth, 2));
         assertTrue(guard.allows(auth, 99));
+    }
+
+    @Test
+    void patientWithoutAPatientIdIsRefused() {
+        ClinicUser patient = new ClinicUser(new DemoUser("unlinked", "unused", Role.PATIENT, OptionalLong.empty()));
+        assertFalse(guard.allows(signedIn(patient), 1));
+    }
+
+    @Test
+    void patientIdsAreComparedByValueBeyondTheBoxedLongCache() {
+        ClinicUser patient = new ClinicUser(new DemoUser("patient", "unused", Role.PATIENT, OptionalLong.of(1000)));
+        assertTrue(guard.allows(signedIn(patient), 1000));
+        assertFalse(guard.allows(signedIn(patient), 1001));
     }
 
     private static Authentication staff(String authority) {
