@@ -1,0 +1,143 @@
+@startuml security-view
+!pragma layout smetana
+title Security view: the filter chain and the config, authn, access and audit packages\n(Spring Security classes are shown in grey; arrows are dependencies or calls)
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+hide empty members
+
+package "Spring Security filter chain (Intercepting Filter)" as chain #F2F2F2 {
+  class BasicAuthenticationFilter <<Spring>>
+  class ExceptionTranslationFilter <<Spring>>
+  class AuthorizationFilter <<Spring>>
+  class "Method security\n(@PreAuthorize)" as MethodSecurity <<Spring>>
+  class DaoAuthenticationProvider <<Spring>>
+}
+
+package config {
+  class SecurityConfig <<@Configuration>> {
+    +api(http, policy, entryPoint, denied) : SecurityFilterChain
+    +roleHierarchy() : RoleHierarchy
+    +passwordEncoder() : PasswordEncoder
+    +authorizationEventPublisher(publisher) : AuthorizationEventPublisher
+  }
+}
+
+package authn {
+  class DemoUserDetailsService <<UserDetailsService>> {
+    +loadUserByUsername(username) : UserDetails
+  }
+  class DemoUsers {
+    +{static} all() : List<DemoUser>
+  }
+  class DemoUser <<record>> {
+    username : String
+    passwordHash : String
+    role : Role
+    patientId : OptionalLong
+  }
+  class ClinicUser {
+    +role() : Role
+    +patientId() : OptionalLong
+  }
+  class ApiAuthenticationEntryPoint <<AuthenticationEntryPoint>> {
+    +commence(request, response, failure)
+  }
+}
+
+package access {
+  class AccessRules {
+    +{static} all() : List<AccessRule>
+  }
+  class AccessRule <<record>> {
+    method : HttpMethod
+    pattern : String
+    requirement : Requirement
+    ownRecord : boolean
+  }
+  interface Requirement <<sealed>>
+  class PermitAll <<record>>
+  class Authenticated <<record>>
+  class AnyRole <<record>> {
+    roles : Set<Role>
+  }
+  enum Role {
+    ADMIN
+    DOCTOR
+    NURSE
+    PATIENT
+  }
+  class AccessPolicy {
+    +configure(registry)
+  }
+  class OwnRecordGuard <<bean "ownRecord">> {
+    +allows(auth, patientId) : boolean
+  }
+  class ApiAccessDeniedHandler <<AccessDeniedHandler>> {
+    +handle(request, response, denied)
+  }
+}
+
+package audit {
+  class SecurityEventListener {
+    +onSuccess(AuthenticationSuccessEvent)
+    +onFailure(AbstractAuthenticationFailureEvent)
+    +onDenied(AuthorizationDeniedEvent)
+  }
+  interface AuditLog {
+    +record(entry)
+    +entries() : List<AuditEntry>
+  }
+  class InMemoryAuditLog
+  class AuditEntry <<record>>
+  enum AuditKind {
+    AUTHN_SUCCESS
+    AUTHN_FAILURE
+    AUTHZ_DENIED
+  }
+}
+
+package web {
+  class PatientController
+  class AdminController
+  class ApiError <<record>>
+}
+
+SecurityConfig ..> AccessPolicy : URL rules
+SecurityConfig ..> ApiAuthenticationEntryPoint : 401
+SecurityConfig ..> ApiAccessDeniedHandler : 403
+
+BasicAuthenticationFilter --> DaoAuthenticationProvider : authenticate
+DaoAuthenticationProvider --> DemoUserDetailsService : loadUserByUsername
+BasicAuthenticationFilter --> ApiAuthenticationEntryPoint : bad credentials
+DemoUserDetailsService ..> DemoUsers
+DemoUsers o-- "5" DemoUser
+DemoUserDetailsService ..> ClinicUser : creates
+ClinicUser ..> Role
+
+ExceptionTranslationFilter --> ApiAuthenticationEntryPoint : anonymous
+ExceptionTranslationFilter --> ApiAccessDeniedHandler : authenticated
+AuthorizationFilter ..> AccessPolicy : rules built by
+AccessPolicy ..> AccessRules
+AccessRules o-- "9" AccessRule
+AccessRule --> Requirement
+Requirement <|.. PermitAll
+Requirement <|.. Authenticated
+Requirement <|.. AnyRole
+AnyRole --> Role
+MethodSecurity --> OwnRecordGuard : @ownRecord.allows
+OwnRecordGuard ..> ClinicUser : reads patientId
+PatientController ..> MethodSecurity : guarded by
+
+ApiAuthenticationEntryPoint ..> ApiError
+ApiAccessDeniedHandler ..> ApiError
+
+SecurityEventListener --> AuditLog : record
+AuditLog <|.. InMemoryAuditLog
+AuditLog o-- AuditEntry
+AuditEntry --> AuditKind
+AdminController --> AuditLog : entries
+DaoAuthenticationProvider ..> SecurityEventListener : authentication events
+AuthorizationFilter ..> SecurityEventListener : AuthorizationDeniedEvent
+MethodSecurity ..> SecurityEventListener : AuthorizationDeniedEvent
+@enduml
