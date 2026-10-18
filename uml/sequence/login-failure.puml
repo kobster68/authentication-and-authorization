@@ -1,0 +1,43 @@
+@startuml login-failure
+title Login failure: bad credentials, unknown user, or no credentials on GET /api/me
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor Client
+participant BasicAuthenticationFilter
+participant ProviderManager
+participant DaoAuthenticationProvider
+participant DemoUserDetailsService
+participant PasswordEncoder
+participant AuthenticationEventPublisher
+participant ExceptionTranslationFilter
+participant AuthorizationFilter
+participant ApiAuthenticationEntryPoint
+
+alt credentials sent
+  Client -> BasicAuthenticationFilter : GET /api/me\nAuthorization: Basic base64(user:password)
+  BasicAuthenticationFilter -> ProviderManager : authenticate(token)
+  ProviderManager -> DaoAuthenticationProvider : authenticate(token)
+  DaoAuthenticationProvider -> DemoUserDetailsService : loadUserByUsername(user)
+  alt known user, wrong password (nurse.patel:wrong)
+    DemoUserDetailsService --> DaoAuthenticationProvider : new ClinicUser(ROLE_NURSE, "{bcrypt}$2a$10$...")
+    DaoAuthenticationProvider -> PasswordEncoder : matches("wrong", "{bcrypt}$2a$10$...")
+    PasswordEncoder --> DaoAuthenticationProvider : false
+  else unknown user (mallory:x)
+    DemoUserDetailsService --> DaoAuthenticationProvider : UsernameNotFoundException
+    DaoAuthenticationProvider -> PasswordEncoder : matches("x", dummy bcrypt hash)\nsame BCrypt cost, so timing does not reveal the user
+  end
+  DaoAuthenticationProvider --> ProviderManager : BadCredentialsException (both cases)
+  ProviderManager -> AuthenticationEventPublisher : publish AuthenticationFailureBadCredentialsEvent\n(an AbstractAuthenticationFailureEvent, for the audit trail)
+  ProviderManager --> BasicAuthenticationFilter : BadCredentialsException
+  BasicAuthenticationFilter -> ApiAuthenticationEntryPoint : commence(request, response, failure)\nthe request stops here: AuthorizationFilter never runs
+  ApiAuthenticationEntryPoint --> Client : 401, WWW-Authenticate: Basic realm="clinic"\n{"status":401,"error":"Unauthorized","path":"/api/me"}
+else no Authorization header
+  Client -> BasicAuthenticationFilter : GET /api/me
+  BasicAuthenticationFilter -> ExceptionTranslationFilter : chain.doFilter(...)\n(nothing to authenticate; the caller stays anonymous)
+  ExceptionTranslationFilter -> AuthorizationFilter : chain.doFilter(...)
+  AuthorizationFilter --> ExceptionTranslationFilter : AccessDeniedException\n(rule "authenticated" is not met by an anonymous caller)
+  ExceptionTranslationFilter -> ApiAuthenticationEntryPoint : caller is anonymous: commence(request, response, failure)
+  ApiAuthenticationEntryPoint --> Client : 401, WWW-Authenticate: Basic realm="clinic"\n{"status":401,"error":"Unauthorized","path":"/api/me"}
+end
+@enduml

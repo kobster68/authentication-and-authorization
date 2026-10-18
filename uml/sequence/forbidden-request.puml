@@ -1,0 +1,37 @@
+@startuml forbidden-request
+title Forbidden request: Bob tries to read Alice's record
+skinparam sequenceMessageAlign center
+actor Bob
+participant BasicAuthenticationFilter as Basic
+participant ExceptionTranslationFilter as Exceptions
+participant AuthorizationFilter as URL
+participant "Method security\n@PreAuthorize" as Method
+participant OwnRecordGuard as Guard
+participant "AuthorizationEventPublisher" as Events
+participant ApiAccessDeniedHandler as Handler
+Bob -> Basic : GET /api/patients/1/record\nvalid bob credentials
+Basic -> Basic : authenticate (PATIENT, patientId=2)
+Basic -> Exceptions : chain.doFilter
+Exceptions -> URL : chain.doFilter
+URL -> Method : PATIENT role passes
+Method -> Guard : allows(authentication, 1)
+Guard --> Method : false (2 != 1)
+Method -> Events : AuthorizationDeniedEvent\nobject: MethodInvocation
+note right of Events
+  Delivered to the audit listener;
+  persistence implemented in slice 3.
+end note
+Method --> Exceptions : AccessDeniedException
+note over Method, Guard
+  Controller body and repository never run.
+end note
+Exceptions -> Handler : authenticated caller: handle(...)
+Handler -> Handler : ApiError.write(..., 403, "Forbidden", request)
+Handler --> Bob : 403 application/json\n{"status":403,"error":"Forbidden","path":"/api/patients/1/record"}
+note over URL, Events
+  Pure role denial: nurse POST /api/patients/1/prescriptions
+  AuthorizationFilter refuses the DOCTOR requirement,
+  publishes AuthorizationDeniedEvent (object: HttpServletRequest),
+  and throws before method security. Same handler returns 403.
+end note
+@enduml
