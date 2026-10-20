@@ -34,6 +34,7 @@ import static edu.rit.swen755.auth.TestFixtures.after;
 import static edu.rit.swen755.auth.TestFixtures.baseline;
 import static edu.rit.swen755.auth.TestFixtures.password;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -190,6 +191,26 @@ class AuditTest {
         assertTrue(success >= 0 && denied > success,
                 "expected AUTHN_SUCCESS then AUTHZ_DENIED for dr.chen on /api/admin/users, got " + recorded);
         assertEquals("GET", recorded.get(denied).method());
+    }
+
+    @Test
+    void aCraftedUsernameCannotForgeAnExtraAuditLine() {
+        AuditBaseline before = baseline(auditLog);
+        // CR, LF and a LINE SEPARATOR (U+2028) embedded in the username, plus a backslash.
+        String forged = "mallory\r\n" + (char) 0x2028 + "SECURITY_AUDIT kind=AUTHN_SUCCESS user=admin\\x";
+        publisher.publishEvent(new AuthenticationFailureBadCredentialsEvent(
+                UsernamePasswordAuthenticationToken.unauthenticated(forged, "x"),
+                new BadCredentialsException("Bad credentials")));
+
+        AuditEntry failure = after(auditLog, before).stream()
+                .filter(e -> e.kind() == AuditKind.AUTHN_FAILURE && e.username().startsWith("mallory"))
+                .findFirst()
+                .orElseGet(() -> fail("no AUTHN_FAILURE entry recorded for the crafted username"));
+        String username = failure.username();
+        assertFalse(username.chars().anyMatch(c -> Character.isISOControl(c)
+                        || c == '\u0085' || c == '\u2028' || c == '\u2029'),
+                "username must not contain control characters or line separators: " + username);
+        assertEquals("mallory\\r\\n\\u2028SECURITY_AUDIT kind=AUTHN_SUCCESS user=admin\\\\x", username);
     }
 
     @Test
