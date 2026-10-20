@@ -1,5 +1,8 @@
 package edu.rit.swen755.auth.audit;
 
+import edu.rit.swen755.auth.access.AccessRule;
+import edu.rit.swen755.auth.access.AccessRules;
+import edu.rit.swen755.auth.access.Requirement;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aopalliance.intercept.MethodInvocation;
 import org.slf4j.Logger;
@@ -9,12 +12,15 @@ import org.springframework.context.event.EventListener;
 import org.springframework.security.authentication.event.AbstractAuthenticationFailureEvent;
 import org.springframework.security.authentication.event.AuthenticationSuccessEvent;
 import org.springframework.security.authorization.event.AuthorizationDeniedEvent;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -42,12 +48,17 @@ public class SecurityEventListener {
     private static final Logger LOGGER = LoggerFactory.getLogger(SecurityEventListener.class);
 
     private final AuditLog log;
+    private final List<RuleMatcher> ruleMatchers;
 
     /**
      * @param log where entries are recorded
      */
     public SecurityEventListener(AuditLog log) {
         this.log = log;
+        this.ruleMatchers = AccessRules.all().stream()
+                .map(rule -> new RuleMatcher(rule,
+                        PathPatternRequestMatcher.pathPattern(rule.method(), rule.pattern())))
+                .toList();
     }
 
     /**
@@ -76,7 +87,9 @@ public class SecurityEventListener {
     /**
      * Records {@link AuditKind#AUTHZ_DENIED}. Detail: for a role decision
      * ({@code AuthorityAuthorizationDecision}) the required {@code ROLE_*} authorities; for a bare
-     * decision {@code denyAll} or {@code authenticated}; when the event object is a
+     * decision, the reason read from the access-table row whose matcher matches the request
+     * ({@code authenticated} when that row's requirement is {@code authenticated}, otherwise
+     * {@code denyAll}, as for a request that matches no row); when the event object is a
      * {@code MethodInvocation} (an own-record denial), the method name.
      *
      * @param event the denial event
@@ -94,10 +107,31 @@ public class SecurityEventListener {
                     .sorted(Comparator.naturalOrder())
                     .collect(Collectors.joining(","));
         } else {
-            String path = requestDetails().path;
-            detail = "/api/me".equals(path) ? "authenticated" : "denyAll";
+            detail = bareDenialDetail(event.getObject());
         }
         record(AuditKind.AUTHZ_DENIED, username, detail);
+    }
+
+    /**
+     * The reason a bare (non-role) denial is recorded with, read from the access table. The first
+     * {@link AccessRule} whose matcher matches the request decides: {@code authenticated} when its
+     * requirement is {@link Requirement.Authenticated}, otherwise {@code denyAll}. A request that
+     * is not an {@link HttpServletRequest}, or that matches no row (for example {@code denyAll}'s
+     * {@code anyRequest()}), is {@code denyAll}.
+     *
+     * @param object the denial event's object
+     * @return {@code authenticated} or {@code denyAll}
+     */
+    private String bareDenialDetail(Object object) {
+        if (object instanceof HttpServletRequest request) {
+            for (RuleMatcher ruleMatcher : ruleMatchers) {
+                if (ruleMatcher.matcher().matches(request)) {
+                    return ruleMatcher.rule().requirement() instanceof Requirement.Authenticated
+                            ? "authenticated" : "denyAll";
+                }
+            }
+        }
+        return "denyAll";
     }
 
     private void record(AuditKind kind, String username, String detail) {
@@ -117,5 +151,8 @@ public class SecurityEventListener {
     }
 
     private record RequestDetails(String method, String path) {
+    }
+
+    private record RuleMatcher(AccessRule rule, RequestMatcher matcher) {
     }
 }

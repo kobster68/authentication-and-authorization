@@ -154,6 +154,28 @@ class AuditTest {
     }
 
     @Test
+    void bareDenialOfAListedPathUnderAnUnlistedMethodIsDenyAll() {
+        AuditBaseline before = baseline(auditLog);
+        Authentication anonymous = new AnonymousAuthenticationToken("key", "anonymousUser",
+                AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS"));
+        RequestAttributes previous = RequestContextHolder.getRequestAttributes();
+        try {
+            MockHttpServletRequest postMeRequest = new MockHttpServletRequest("POST", "/api/me");
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(postMeRequest));
+            publisher.publishEvent(new AuthorizationDeniedEvent<>(() -> anonymous, postMeRequest,
+                    new org.springframework.security.authorization.AuthorizationDecision(false)));
+        } finally {
+            RequestContextHolder.setRequestAttributes(previous);
+        }
+
+        List<AuditEntry> recorded = after(auditLog, before);
+        AuditEntry denial = find(recorded, AuditKind.AUTHZ_DENIED, "anonymous");
+        assertEquals("denyAll", denial.detail());
+        assertEquals("POST", denial.method());
+        assertEquals("/api/me", denial.path());
+    }
+
+    @Test
     void aForbiddenRequestThroughTheRealChainLogsSuccessThenDenial() throws Exception {
         AuditBaseline before = baseline(auditLog);
 
