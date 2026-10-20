@@ -18,7 +18,26 @@ Failed logins and denied requests are recorded in an audit log that an administr
 The tactics are described in *Software Architecture in Practice*, 4th ed. (Bass, Clements, and
 Kazman), Chapter 11, p. 174.
 
-<!-- TODO(slice 4: Mallikarjuna): expand the summary (domain, the two tactics, where each lives). -->
+**The domain.** A clinic was chosen because it needs both kinds of authorization the textbook names:
+access by role (a nurse may record vitals but not prescribe; only an administrator may read the audit
+log) and access by individual actor (two patients share a role, yet each may see only their own
+record). All data is fictional and held in memory.
+
+**Where each tactic lives.**
+
+- *Identify Actors and Authenticate Actors* are in the `authn` package. Spring Security's
+  `BasicAuthenticationFilter` reads the username and password from each request.
+  `DaoAuthenticationProvider` looks the user up in `DemoUserDetailsService` and checks the password
+  against its `{bcrypt}` hash. On failure, `ApiAuthenticationEntryPoint` answers 401.
+- *Authorize Actors and Limit Access* are in the `access` package. `AccessPolicy` generates the URL
+  rules from the table in `AccessRules` and ends with "deny everything else". `OwnRecordGuard` is the
+  per-patient check, called through `@PreAuthorize` on the two patient read services.
+  `ApiAccessDeniedHandler` answers 403.
+- *Audit* is in the `audit` package. `SecurityEventListener` turns Spring Security's authentication
+  and authorization events into entries in `InMemoryAuditLog`.
+- `config.SecurityConfig` wires all of this into one filter chain (the textbook's Intercepting
+  Filter), and the controllers in `web` contain no security code of their own.
+
 
 ## Prerequisites
 
@@ -65,7 +84,29 @@ scripts/demo.sh                          # against http://localhost:8080
 scripts/demo.sh http://localhost:9090    # another port
 ```
 
-<!-- TODO(slice 4: Mallikarjuna): add a short sample of the demo output. -->
+A shortened sample from a run against the packaged jar (the full run checks 80 rows):
+
+```
+demo: http://localhost:8080
+EXPECTED ACTUAL METHOD PATH                              USER               RESULT
+200      200    GET    /api/public/info                  -                  OK
+401      401    GET    /api/me                           -                  OK
+200      200    GET    /api/patients/1/record            alice              OK
+403      403    GET    /api/patients/1/record            bob                OK
+404      404    GET    /api/patients/99/record           dr.chen            OK
+403      403    GET    /api/patients/99/record           alice              OK
+403      403    POST   /api/patients/1/prescriptions     nurse.patel        OK
+201      201    POST   /api/patients/1/prescriptions     dr.chen            OK
+403      403    GET    /api/nothing                      admin              OK
+401      401    GET    /api/public/info                  mallory:x          OK
+...
+
+Audit log (GET /api/admin/audit as admin; best effort, not part of the check):
+[{"at":"...","kind":"AUTHN_SUCCESS","username":"admin","method":"GET","path":"/api/public/info","detail":"-"}, ...]
+
+demo: 80 rows checked, 0 mismatch(es)
+```
+
 
 ## Demo users
 
@@ -145,14 +186,40 @@ Every authenticated request is recorded in the audit log (HTTP Basic sends crede
 request, so there is no separate "login"), together with every failed authentication and every
 denial. The log is held in memory and keeps the newest 1000 entries.
 
-<!-- TODO(slice 4: Mallikarjuna): refine the audit explanation and add an example entry. -->
+Each entry has a time, a kind, the username (`anonymous` when no credentials were sent), the HTTP
+method and path, and a detail field that says why:
+
+| Kind | Recorded when | Detail |
+| --- | --- | --- |
+| `AUTHN_SUCCESS` | a request's credentials are accepted | `-` |
+| `AUTHN_FAILURE` | a request's credentials are rejected (wrong password or unknown user) | the exception, e.g. `BadCredentialsException` |
+| `AUTHZ_DENIED` | a URL rule or the own-record check refuses a request | the required roles (e.g. `ROLE_DOCTOR`), `denyAll`, `authenticated`, or the guarded method (e.g. `record`) |
+
+For example, when bob asks for Alice's record, the log gains two entries. His credentials are
+accepted, and then the own-record check refuses him:
+
+```json
+{"at":"2026-10-16T18:14:43.878916Z","kind":"AUTHN_SUCCESS","username":"bob","method":"GET","path":"/api/patients/1/record","detail":"-"}
+{"at":"2026-10-16T18:14:43.879830Z","kind":"AUTHZ_DENIED","username":"bob","method":"GET","path":"/api/patients/1/record","detail":"record"}
+```
+
+Each entry is also written to the server's console log as a `SECURITY_AUDIT` line. A malformed
+`Authorization` header (not valid Base64, or no `username:password` inside) is refused with 401
+before Spring publishes any event, so it is not recorded.
+
 
 ## Libraries and frameworks
 
 The assignment allows JAAS or the Spring Framework. This project uses **Spring Security** (with
 Spring Boot); JAAS is not used anywhere.
 
-<!-- TODO(slice 4: Mallikarjuna): say why Spring Security was chosen over JAAS. -->
+Spring Security was chosen over JAAS because it fits an HTTP API directly. It puts one filter
+chain in front of every request (authentication, then URL authorization), and it provides method
+security for the per-patient check, password encoders for bcrypt, and security events for the audit
+log. JAAS supplies pluggable login modules but has no notion of URLs, so the URL-to-role rules would
+have had to be written by hand. Its authorization side relied on the Java Security Manager, which
+JEP 486 permanently disabled in JDK 24. The design document records this decision (Section 8, D1).
+
 
 | Component | Version | Use |
 | --- | --- | --- |
@@ -176,7 +243,23 @@ All library versions are managed by the Spring Boot parent POM.
 The design document is written one section per file under `docs/sections/` and exported to
 `docs/design-document.pdf` with `scripts/export-pdf.sh` (needs pandoc).
 
-<!-- TODO(slice 4: Mallikarjuna): link the PDF and list the sections. -->
+```bash
+scripts/export-pdf.sh                    # writes docs/design-document.pdf
+PDF_ENGINE=xelatex scripts/export-pdf.sh # choose a PDF engine
+```
+
+The exported document is [`docs/design-document.pdf`](docs/design-document.pdf). Its sections:
+
+1. [Purpose and requirements](docs/sections/01-purpose.md): the two tactics and a checklist of every assignment requirement.
+2. [Security scenarios](docs/sections/02-scenarios.md): one six-part scenario per tactic, and the trusted-network assumption.
+3. [Tactics and where they live](docs/sections/03-tactics.md): the filter chain, and each tactic traced to its classes.
+4. [Privilege matrix](docs/sections/04-privilege-matrix.md): the access table, the access matrix, per-role versus per-actor control.
+5. [Security view](docs/sections/05-security-view.md): the class diagram (`uml/class/`) and the element catalog.
+6. [Sequence diagrams](docs/sections/06-sequence-diagrams.md): login success and failure, authorized and forbidden requests (`uml/sequence/`).
+7. [Tactics questionnaire](docs/sections/07-tactics-questionnaire.md): every security tactic in the chapter, supported or not, with risk.
+8. [Design decisions](docs/sections/08-decisions.md): decisions with discarded alternatives, trade-offs, and the Basic-without-TLS limitation.
+9. [Verification](docs/sections/09-verification.md): the test summary, the demo transcript and an audit log excerpt.
+
 
 ## Team and slice ownership
 
