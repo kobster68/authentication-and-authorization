@@ -38,7 +38,7 @@ The layout follows the security scenario in Table 19.1 of SAiP.
 | Stimulus | Asks for another patient's data: `GET /api/patients/1/record` (Alice's record) |
 | Artifact | The authorization rules: the URL rules generated from `AccessRules` and the per-actor check `OwnRecordGuard` |
 | Environment | Normal operation, on a trusted local network |
-| Response | The URL rule admits the request (a PATIENT may call the service), and the own-record check refuses it before the record is read. The caller receives `403 Forbidden` with a JSON body naming only the status and path. The denial is recorded in the audit log as `AUTHZ_DENIED` |
+| Response | The URL rule admits the request (a PATIENT may call the service), and the own-record check refuses it before the record is read. The caller receives `403 Forbidden` with a JSON body naming only the status, error and path. The denial is recorded in the audit log as `AUTHZ_DENIED` |
 | Response measure | 0 unauthorized grants across all 72 user-by-service cells of the access matrix (Section 4); a patient never learns whether another patient id exists (403 comes before any 404) |
 
 The same response applies to the per-role case: a NURSE posting a prescription, or any non-admin

@@ -65,7 +65,7 @@ demo: 80 rows checked, 0 mismatch(es)
 
 These results meet the response measures of Section 2:
 
-- **S1:** every request with missing or bad credentials (the 12 anonymous rows and the 8 bad-credential
+- **S1:** every request with missing or bad credentials (the 11 anonymous rows to protected URLs and the 8 bad-credential
   rows) got 401, and none returned protected data.
 - **S2:** each of the 72 cells of the access matrix returned the expected status, so there were 0
   unauthorized grants. Both patients got 403, never 404, for ids other than their own.
