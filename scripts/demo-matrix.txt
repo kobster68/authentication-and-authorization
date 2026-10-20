@@ -19,71 +19,71 @@
 
 # --- GET /api/me
 401         GET     /api/me                           -                  -             # needs: 1
-# 200         GET     /api/me                           admin              -             # needs: 2,3
-# 200         GET     /api/me                           dr.chen            -             # needs: 2,3
-# 200         GET     /api/me                           nurse.patel        -             # needs: 2,3
-# 200         GET     /api/me                           alice              -             # needs: 2,3
-# 200         GET     /api/me                           bob                -             # needs: 2,3
+200         GET     /api/me                           admin              -             # needs: 2,3
+200         GET     /api/me                           dr.chen            -             # needs: 2,3
+200         GET     /api/me                           nurse.patel        -             # needs: 2,3
+200         GET     /api/me                           alice              -             # needs: 2,3
+200         GET     /api/me                           bob                -             # needs: 2,3
 
 # --- GET /api/patients/1/record
 401         GET     /api/patients/1/record            -                  -             # needs: 1
-# 200         GET     /api/patients/1/record            admin              -             # needs: 2,3
-# 200         GET     /api/patients/1/record            dr.chen            -             # needs: 2,3
-# 200         GET     /api/patients/1/record            nurse.patel        -             # needs: 2,3
-# 200         GET     /api/patients/1/record            alice              -             # needs: 2,3
+200         GET     /api/patients/1/record            admin              -             # needs: 2,3
+200         GET     /api/patients/1/record            dr.chen            -             # needs: 2,3
+200         GET     /api/patients/1/record            nurse.patel        -             # needs: 2,3
+200         GET     /api/patients/1/record            alice              -             # needs: 2,3
 403         GET     /api/patients/1/record            bob                -             # needs: 2
 
 # --- GET /api/patients/2/record
 401         GET     /api/patients/2/record            -                  -             # needs: 1
-# 200         GET     /api/patients/2/record            admin              -             # needs: 2,3
-# 200         GET     /api/patients/2/record            dr.chen            -             # needs: 2,3
-# 200         GET     /api/patients/2/record            nurse.patel        -             # needs: 2,3
+200         GET     /api/patients/2/record            admin              -             # needs: 2,3
+200         GET     /api/patients/2/record            dr.chen            -             # needs: 2,3
+200         GET     /api/patients/2/record            nurse.patel        -             # needs: 2,3
 403         GET     /api/patients/2/record            alice              -             # needs: 2
-# 200         GET     /api/patients/2/record            bob                -             # needs: 2,3
+200         GET     /api/patients/2/record            bob                -             # needs: 2,3
 
 # --- GET /api/patients/1/appointments
 401         GET     /api/patients/1/appointments      -                  -             # needs: 1
-# 200         GET     /api/patients/1/appointments      admin              -             # needs: 2,3
-# 200         GET     /api/patients/1/appointments      dr.chen            -             # needs: 2,3
-# 200         GET     /api/patients/1/appointments      nurse.patel        -             # needs: 2,3
-# 200         GET     /api/patients/1/appointments      alice              -             # needs: 2,3
+200         GET     /api/patients/1/appointments      admin              -             # needs: 2,3
+200         GET     /api/patients/1/appointments      dr.chen            -             # needs: 2,3
+200         GET     /api/patients/1/appointments      nurse.patel        -             # needs: 2,3
+200         GET     /api/patients/1/appointments      alice              -             # needs: 2,3
 403         GET     /api/patients/1/appointments      bob                -             # needs: 2
 
 # --- GET /api/patients/99/record
 401         GET     /api/patients/99/record           -                  -             # needs: 1
-# 404         GET     /api/patients/99/record           admin              -             # needs: 2,3
-# 404         GET     /api/patients/99/record           dr.chen            -             # needs: 2,3
-# 404         GET     /api/patients/99/record           nurse.patel        -             # needs: 2,3
+404         GET     /api/patients/99/record           admin              -             # needs: 2,3
+404         GET     /api/patients/99/record           dr.chen            -             # needs: 2,3
+404         GET     /api/patients/99/record           nurse.patel        -             # needs: 2,3
 403         GET     /api/patients/99/record           alice              -             # needs: 2
 403         GET     /api/patients/99/record           bob                -             # needs: 2
 
 # --- GET /api/patients
 401         GET     /api/patients                     -                  -             # needs: 1
-# 200         GET     /api/patients                     admin              -             # needs: 2,3
-# 200         GET     /api/patients                     dr.chen            -             # needs: 2,3
-# 200         GET     /api/patients                     nurse.patel        -             # needs: 2,3
+200         GET     /api/patients                     admin              -             # needs: 2,3
+200         GET     /api/patients                     dr.chen            -             # needs: 2,3
+200         GET     /api/patients                     nurse.patel        -             # needs: 2,3
 403         GET     /api/patients                     alice              -             # needs: 2
 403         GET     /api/patients                     bob                -             # needs: 2
 
 # --- POST /api/patients/1/vitals
 401         POST    /api/patients/1/vitals            -                  vitals        # needs: 1
-# 201         POST    /api/patients/1/vitals            admin              vitals        # needs: 2,3
-# 201         POST    /api/patients/1/vitals            dr.chen            vitals        # needs: 2,3
-# 201         POST    /api/patients/1/vitals            nurse.patel        vitals        # needs: 2,3
+201         POST    /api/patients/1/vitals            admin              vitals        # needs: 2,3
+201         POST    /api/patients/1/vitals            dr.chen            vitals        # needs: 2,3
+201         POST    /api/patients/1/vitals            nurse.patel        vitals        # needs: 2,3
 403         POST    /api/patients/1/vitals            alice              vitals        # needs: 2
 403         POST    /api/patients/1/vitals            bob                vitals        # needs: 2
 
 # --- POST /api/patients/1/prescriptions
 401         POST    /api/patients/1/prescriptions     -                  prescription  # needs: 1
-# 201         POST    /api/patients/1/prescriptions     admin              prescription  # needs: 2,3
-# 201         POST    /api/patients/1/prescriptions     dr.chen            prescription  # needs: 2,3
+201         POST    /api/patients/1/prescriptions     admin              prescription  # needs: 2,3
+201         POST    /api/patients/1/prescriptions     dr.chen            prescription  # needs: 2,3
 403         POST    /api/patients/1/prescriptions     nurse.patel        prescription  # needs: 2
 403         POST    /api/patients/1/prescriptions     alice              prescription  # needs: 2
 403         POST    /api/patients/1/prescriptions     bob                prescription  # needs: 2
 
 # --- GET /api/admin/users
 401         GET     /api/admin/users                  -                  -             # needs: 1
-# 200         GET     /api/admin/users                  admin              -             # needs: 2,3
+200         GET     /api/admin/users                  admin              -             # needs: 2,3
 403         GET     /api/admin/users                  dr.chen            -             # needs: 2
 403         GET     /api/admin/users                  nurse.patel        -             # needs: 2
 403         GET     /api/admin/users                  alice              -             # needs: 2
@@ -91,7 +91,7 @@
 
 # --- GET /api/admin/audit
 401         GET     /api/admin/audit                  -                  -             # needs: 1
-# 200         GET     /api/admin/audit                  admin              -             # needs: 2,3
+200         GET     /api/admin/audit                  admin              -             # needs: 2,3
 403         GET     /api/admin/audit                  dr.chen            -             # needs: 2
 403         GET     /api/admin/audit                  nurse.patel        -             # needs: 2
 403         GET     /api/admin/audit                  alice              -             # needs: 2
