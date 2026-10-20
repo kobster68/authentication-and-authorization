@@ -5,7 +5,6 @@ import edu.rit.swen755.auth.TestFixtures.MatrixRow;
 import edu.rit.swen755.auth.audit.AuditEntry;
 import edu.rit.swen755.auth.audit.AuditKind;
 import edu.rit.swen755.auth.audit.AuditLog;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -36,7 +35,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * cross-slice evidence: it needs authentication, authorization and the services together, so it
  * is enabled by whichever of slices 1 to 3 merges last.
  */
-@Disabled("TODO(last slice to merge) — enable when slices 1–3 are all on main")
 @SpringBootTest
 @AutoConfigureMockMvc
 class AccessMatrixTest {

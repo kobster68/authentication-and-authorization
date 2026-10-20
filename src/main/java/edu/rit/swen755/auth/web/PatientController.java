@@ -47,7 +47,7 @@ public class PatientController {
      */
     @GetMapping("/api/patients")
     public List<Patient> patients() {
-        throw new UnsupportedOperationException("TODO(slice 3: Chase)");
+        return clinic.patients();
     }
 
     /**
@@ -60,7 +60,7 @@ public class PatientController {
     @GetMapping("/api/patients/{id}/record")
     @PreAuthorize("@ownRecord.allows(authentication, #id)")
     public MedicalRecord record(@PathVariable long id) {
-        throw new UnsupportedOperationException("TODO(slice 3: Chase)");
+        return clinic.record(id);
     }
 
     /**
@@ -73,7 +73,7 @@ public class PatientController {
     @GetMapping("/api/patients/{id}/appointments")
     @PreAuthorize("@ownRecord.allows(authentication, #id)")
     public List<Appointment> appointments(@PathVariable long id) {
-        throw new UnsupportedOperationException("TODO(slice 3: Chase)");
+        return clinic.appointments(id);
     }
 
     /**
@@ -88,7 +88,7 @@ public class PatientController {
     @PostMapping("/api/patients/{id}/vitals")
     @ResponseStatus(HttpStatus.CREATED)
     public Vitals addVitals(@PathVariable long id, @RequestBody Vitals vitals) {
-        throw new UnsupportedOperationException("TODO(slice 3: Chase)");
+        return clinic.addVitals(id, vitals);
     }
 
     /**
@@ -103,6 +103,6 @@ public class PatientController {
     @PostMapping("/api/patients/{id}/prescriptions")
     @ResponseStatus(HttpStatus.CREATED)
     public Prescription addPrescription(@PathVariable long id, @RequestBody Prescription prescription) {
-        throw new UnsupportedOperationException("TODO(slice 3: Chase)");
+        return clinic.addPrescription(id, prescription);
     }
 }

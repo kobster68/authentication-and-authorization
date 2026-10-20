@@ -5,13 +5,13 @@ import edu.rit.swen755.auth.audit.AuditEntry;
 import edu.rit.swen755.auth.audit.AuditKind;
 import edu.rit.swen755.auth.audit.AuditLog;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithUserDetails;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.MockMvc;
@@ -42,7 +42,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * tests exercise only the controllers and the repository and are green with slice 3 and Step 0
  * alone. {@code @WithUserDetails} installs a real {@code ClinicUser} principal from the user store.
  */
-@Disabled("TODO(slice 3: Chase) — enable when implementing")
 @SpringBootTest
 @AutoConfigureMockMvc(addFilters = false)
 class ServicesTest {
@@ -111,6 +110,8 @@ class ServicesTest {
         mvc.perform(get("/api/patients/99/appointments")).andExpect(status().isNotFound());
         mvc.perform(post("/api/patients/99/vitals").contentType(MediaType.APPLICATION_JSON).content(VITALS))
                 .andExpect(status().isNotFound());
+        mvc.perform(post("/api/patients/99/prescriptions").contentType(MediaType.APPLICATION_JSON).content(PRESCRIPTION))
+            .andExpect(status().isNotFound());
     }
 
     @Test
@@ -130,6 +131,16 @@ class ServicesTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("admin"))
                 .andExpect(jsonPath("$.role").value("ADMIN"))
+                .andExpect(jsonPath("$.patientId").value(nullValue()));
+    }
+
+    @Test
+    @WithMockUser(username = "legacy-user", authorities = {"ROLE_DOCTOR", "SCOPE_read"})
+    void meFallsBackForANonClinicPrincipal() throws Exception {
+        mvc.perform(get("/api/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("legacy-user"))
+                .andExpect(jsonPath("$.role").value("DOCTOR"))
                 .andExpect(jsonPath("$.patientId").value(nullValue()));
     }
 

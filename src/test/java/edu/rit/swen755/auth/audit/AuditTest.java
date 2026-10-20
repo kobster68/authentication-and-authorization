@@ -6,7 +6,6 @@ import edu.rit.swen755.auth.authn.ClinicUser;
 import edu.rit.swen755.auth.authn.DemoUserDetailsService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,6 +34,7 @@ import static edu.rit.swen755.auth.TestFixtures.after;
 import static edu.rit.swen755.auth.TestFixtures.baseline;
 import static edu.rit.swen755.auth.TestFixtures.password;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -51,7 +51,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * depends on slice 3's code alone. Every test takes a baseline first and only looks at entries
  * recorded after it.
  */
-@Disabled("TODO(slice 3: Chase) — enable when implementing")
 @SpringBootTest
 @AutoConfigureMockMvc
 class AuditTest {
@@ -111,12 +110,70 @@ class AuditTest {
         AuditEntry success = find(recorded, AuditKind.AUTHN_SUCCESS, "alice");
         assertEquals("GET", success.method());
         assertEquals("/api/patients/2/record", success.path());
+        assertEquals("-", success.detail());
 
         AuditEntry denied = find(recorded, AuditKind.AUTHZ_DENIED, "anonymous");
         assertEquals("GET", denied.method());
         assertEquals("/api/patients/2/record", denied.path());
         assertTrue(denied.detail().contains("ROLE_ADMIN"), "denial detail should name the required role: " + denied.detail());
         assertTrue(recorded.stream().allMatch(e -> e.at() != null && !e.at().isAfter(Instant.now())));
+    }
+
+    @Test
+    void bareDenialsRecordAuthenticatedAndDenyAllDetails() {
+        AuditBaseline before = baseline(auditLog);
+        ClinicUser alice = (ClinicUser) users.loadUserByUsername("alice");
+        Authentication aliceAuthentication = UsernamePasswordAuthenticationToken.authenticated(
+                alice, null, alice.getAuthorities());
+        Authentication anonymous = new AnonymousAuthenticationToken("key", "anonymousUser",
+                AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS"));
+        RequestAttributes previous = RequestContextHolder.getRequestAttributes();
+        try {
+            MockHttpServletRequest meRequest = new MockHttpServletRequest("GET", "/api/me");
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(meRequest));
+            publisher.publishEvent(new AuthorizationDeniedEvent<>(() -> aliceAuthentication, meRequest,
+                    new org.springframework.security.authorization.AuthorizationDecision(false)));
+
+            MockHttpServletRequest unknownRequest = new MockHttpServletRequest("POST", "/api/nothing");
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(unknownRequest));
+            publisher.publishEvent(new AuthorizationDeniedEvent<>(() -> anonymous, unknownRequest,
+                    new org.springframework.security.authorization.AuthorizationDecision(false)));
+        } finally {
+            RequestContextHolder.setRequestAttributes(previous);
+        }
+
+        List<AuditEntry> recorded = after(auditLog, before);
+        AuditEntry authenticatedDenial = find(recorded, AuditKind.AUTHZ_DENIED, "alice");
+        assertEquals("authenticated", authenticatedDenial.detail());
+        assertEquals("GET", authenticatedDenial.method());
+        assertEquals("/api/me", authenticatedDenial.path());
+
+        AuditEntry defaultDenial = find(recorded, AuditKind.AUTHZ_DENIED, "anonymous");
+        assertEquals("denyAll", defaultDenial.detail());
+        assertEquals("POST", defaultDenial.method());
+        assertEquals("/api/nothing", defaultDenial.path());
+    }
+
+    @Test
+    void bareDenialOfAListedPathUnderAnUnlistedMethodIsDenyAll() {
+        AuditBaseline before = baseline(auditLog);
+        Authentication anonymous = new AnonymousAuthenticationToken("key", "anonymousUser",
+                AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS"));
+        RequestAttributes previous = RequestContextHolder.getRequestAttributes();
+        try {
+            MockHttpServletRequest postMeRequest = new MockHttpServletRequest("POST", "/api/me");
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(postMeRequest));
+            publisher.publishEvent(new AuthorizationDeniedEvent<>(() -> anonymous, postMeRequest,
+                    new org.springframework.security.authorization.AuthorizationDecision(false)));
+        } finally {
+            RequestContextHolder.setRequestAttributes(previous);
+        }
+
+        List<AuditEntry> recorded = after(auditLog, before);
+        AuditEntry denial = find(recorded, AuditKind.AUTHZ_DENIED, "anonymous");
+        assertEquals("denyAll", denial.detail());
+        assertEquals("POST", denial.method());
+        assertEquals("/api/me", denial.path());
     }
 
     @Test
@@ -134,6 +191,26 @@ class AuditTest {
         assertTrue(success >= 0 && denied > success,
                 "expected AUTHN_SUCCESS then AUTHZ_DENIED for dr.chen on /api/admin/users, got " + recorded);
         assertEquals("GET", recorded.get(denied).method());
+    }
+
+    @Test
+    void aCraftedUsernameCannotForgeAnExtraAuditLine() {
+        AuditBaseline before = baseline(auditLog);
+        // CR, LF and a LINE SEPARATOR (U+2028) embedded in the username, plus a backslash.
+        String forged = "mallory\r\n" + (char) 0x2028 + "SECURITY_AUDIT kind=AUTHN_SUCCESS user=admin\\x";
+        publisher.publishEvent(new AuthenticationFailureBadCredentialsEvent(
+                UsernamePasswordAuthenticationToken.unauthenticated(forged, "x"),
+                new BadCredentialsException("Bad credentials")));
+
+        AuditEntry failure = after(auditLog, before).stream()
+                .filter(e -> e.kind() == AuditKind.AUTHN_FAILURE && e.username().startsWith("mallory"))
+                .findFirst()
+                .orElseGet(() -> fail("no AUTHN_FAILURE entry recorded for the crafted username"));
+        String username = failure.username();
+        assertFalse(username.chars().anyMatch(c -> Character.isISOControl(c)
+                        || c == '\u0085' || c == '\u2028' || c == '\u2029'),
+                "username must not contain control characters or line separators: " + username);
+        assertEquals("mallory\\r\\n\\u2028SECURITY_AUDIT kind=AUTHN_SUCCESS user=admin\\\\x", username);
     }
 
     @Test
