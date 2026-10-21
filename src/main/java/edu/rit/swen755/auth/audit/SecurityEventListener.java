@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
  * Turns Spring Security's authentication and authorization events into audit entries, so no
  * controller has to record anything itself.
  *
- * <p>Common rules for every entry (slice 3: Chase):
+ * <p>Common rules for every entry:
  * <ul>
  *   <li>username: {@code event.getAuthentication().get().getName()} for an authorization event
  *       (the authentication's name for an authentication event), with {@code anonymousUser}
@@ -38,9 +38,6 @@ import java.util.stream.Collectors;
  *   <li>each entry is appended to the {@link AuditLog} and written to the application log at INFO
  *       as {@code SECURITY_AUDIT kind=.. user=.. method=.. path=.. detail=..}.</li>
  * </ul>
- *
- * <p>Step 0 ships the three listener methods with empty bodies, so every request path works
- * while slice 3 is being built.
  */
 @Component
 public class SecurityEventListener {
