@@ -40,9 +40,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Acceptance tests for authorization (slice 2): per-role denials from the URL rules, per-actor
  * denials from the own-record check, default deny, and the publication of denial events.
  *
- * <p>Only denials are asserted here. Success cells reach controllers that slice 3 owns, so they
- * are asserted in {@code AccessMatrixTest}; the two hierarchy and error-dispatch checks below ask
- * the URL authorization manager directly for the same reason. Green with slice 2 and Step 0 alone.
+ * <p>Only denials are asserted here. Success cells reach the controllers and are asserted in
+ * {@code AccessMatrixTest}; the two hierarchy and error-dispatch checks below ask the URL
+ * authorization manager directly for the same reason.
  */
 @SpringBootTest
 @AutoConfigureMockMvc

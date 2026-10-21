@@ -8,7 +8,7 @@ both on every pull request.
 ## Test summary (`mvn verify`)
 
 | Test class | Tests | What it covers |
-| --- | --- | --- |
+| ---------------- | ---- | ------------------------------------------------------------ |
 | `authn.AuthenticationTest` | 25 | Scenario S1: a missing credential, a wrong password and an unknown user all get 401 with the `Basic` challenge and the JSON body on every protected URL; an unknown user is byte-for-byte identical to a wrong password in status, headers, body and failure event; anonymous requests to unmapped URLs and to writes are 401, not 403; a malformed or foreign `Authorization` header is 401, not 500; each request re-authenticates with no session; success and failure events are published |
 | `authn.ApiAuthenticationEntryPointTest` | 2 | The 401 entry point on its own: the status, the `WWW-Authenticate: Basic` challenge and JSON content type, and a response that never reveals the failure reason |
 | `access.AuthorizationTest` | 14 | Scenario S2 denials: per-role URL denials with the 403 JSON body, default deny on an unmapped URL and on a wrong method even for admin, per-actor own-record denials, a patient blocked from recording vitals before method security runs, URL- versus method-level denial events, admin admitted through the role hierarchy, and the permitted error dispatch |
@@ -18,10 +18,10 @@ both on every pull request.
 | `web.ServicesTest` | 11 | Each clinic service with the filters off: list patients, read a record and appointments, 201 echoing the stored vitals and prescription, 404 for an unknown patient id, `/api/me` carrying the patient id for a patient, null for staff and a fallback for a non-clinic principal, the admin user list without hashes, and the audit as an ISO-8601 JSON array |
 | `web.ApiErrorTest` | 3 | `ApiError.write`: the exact body with JSON content type and length, the path escaped with the fields in order, and a clean body even when a stale response was already buffered |
 | `ContractSmokeTest` | 8 | The shared contract: the context loads with the policy as a plain component, the nine access rows in order, the five seeded users with bcrypt hashes matching their passwords, a fresh `ClinicUser` per lookup, an unknown user throwing `UsernameNotFoundException`, anonymous public info 200 through the real chain, the matrix file parsing to 80 rows, and the audit log keeping the newest 1000 entries oldest-first |
-| `docs.DocsConsistencyTest` | 5 | The README's URL and user tables match the code, every section file exists with its heading, and no `TODO` marker remains anywhere in the README or the section files |
+| `docs.DocsConsistencyTest` | 4 | The README's URL and user tables match the code, every section file exists with its heading, and no `TODO` marker remains in the README or the section files |
 | `AccessMatrixTest` | 82 | Every one of the 80 rows of `scripts/demo-matrix.txt` through the real filter chain with real HTTP Basic credentials, plus two audit checks: a failed login is recorded as `AUTHN_FAILURE`, and a denial is recorded as `AUTHN_SUCCESS` then `AUTHZ_DENIED` |
 
-Totals: 164 tests, 0 failures, 0 errors, 0 skipped, `BUILD SUCCESS`.
+Totals: 163 tests, 0 failures, 0 errors, 0 skipped, `BUILD SUCCESS`.
 
 ## Demo transcript (`scripts/demo.sh` against the packaged jar)
 

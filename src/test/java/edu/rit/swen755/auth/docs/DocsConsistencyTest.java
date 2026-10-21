@@ -73,17 +73,6 @@ class DocsConsistencyTest {
     }
 
     @Test
-    void noTodoMarkersRemainOutsideTheVerificationSection() throws IOException {
-        List<Path> files = new ArrayList<>(List.of(README));
-        for (String name : SECTION_HEADINGS.keySet()) {
-            if (!name.equals("09-verification.md")) {
-                files.add(SECTIONS.resolve(name));
-            }
-        }
-        assertNoTodo(files);
-    }
-
-    @Test
     void noTodoMarkersRemainAnywhere() throws IOException {
         List<Path> files = new ArrayList<>(List.of(README));
         for (String name : SECTION_HEADINGS.keySet()) {
