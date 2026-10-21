@@ -1,15 +1,3 @@
-<!-- Owner: Mallikarjuna (slice 4) for the framing; tactic paragraphs by Godson (slice 1), Kobe (slice 2), Chase (slice 3) -->
-<!--
-What belongs in this section:
-- Framing (slice 4): the filter chain as the textbook's Intercepting Filter (p. 194) and its intermediary cost (p. 179).
-- Identify Actors and Authenticate Actors (slice 1): what each tactic is (p. 174) and where it lives:
-  BasicAuthenticationFilter -> DaoAuthenticationProvider -> DemoUserDetailsService, bcrypt through the PasswordEncoder.
-- Authorize Actors per role and per actor, and Limit Access by default deny (slice 2): AuthorizationFilter over AccessPolicy
-  with the role hierarchy; OwnRecordGuard through method security; why the rules are generated from AccessRules.
-- Audit (slice 3, p. 176): SecurityEventListener, what is recorded and where, and that each authenticated request is recorded
-  under stateless HTTP Basic.
--->
-
 # 3. Tactics and where they live
 
 All the security in the portal lives in one place: a single Spring Security filter chain, declared
@@ -41,11 +29,7 @@ stateless HTTP Basic repeats on every authenticated request, about 60 to 80 ms o
 laptop against a few milliseconds for an anonymous call. We accept that cost in exchange for a
 single, auditable place where security decisions are made (Section 8, decisions D3 and D5).
 
-The subsections below were written by the slice that built each tactic.
-
 ## Identify Actors and Authenticate Actors
-
-<!-- Slice 1 (Godson) writes this subsection. -->
 
 **Identify Actors.** The textbook describes this tactic as identifying "the source of any external
 input to the system", and notes that "users are typically identified through user IDs" (Bass,
@@ -109,8 +93,6 @@ once". The sequence diagrams in Section 6 show the success and failure paths mes
 
 ## Authorize Actors and Limit Access
 
-<!-- Slice 2 (Kobe) writes this subsection. -->
-
 **Authorize Actors, per role.** Authorize Actors determines which services an authenticated
 actor may use (Bass, Clements, and Kazman, *Software Architecture in Practice*, 4th ed.,
 p. 174). `AuthorizationFilter` checks the request's HTTP method and URL before a controller
@@ -140,8 +122,8 @@ Both URL and method denials publish `AuthorizationDeniedEvent` through the publi
 in `SecurityConfig`. The event object identifies either the request or the method invocation.
 For an authenticated caller, `ExceptionTranslationFilter` routes the exception to
 `ApiAccessDeniedHandler`, which uses `ApiError` to write status 403 and
-`{"status":403,"error":"Forbidden","path":"<request URI>"}`. Anonymous callers instead use the
-401 entry point supplied by slice 1. Event persistence is the responsibility of slice 3.
+`{"status":403,"error":"Forbidden","path":"<request URI>"}`. Anonymous callers are sent to the
+401 entry point instead. The audit listener records the event.
 
 ## Audit
 
