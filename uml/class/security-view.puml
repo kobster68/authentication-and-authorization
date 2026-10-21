@@ -11,8 +11,15 @@ package "Spring Security filter chain (Intercepting Filter)" as chain #F2F2F2 {
   class ExceptionTranslationFilter <<Spring>>
   class AuthorizationFilter <<Spring>>
   class "Method security\n(@PreAuthorize)" as MethodSecurity <<Spring>>
+  class ProviderManager <<Spring>>
   class DaoAuthenticationProvider <<Spring>>
 }
+
+' Layout only: stack the filters in request order so each call leaves the chain next to its
+' own label instead of collapsing into a horizontal band.
+BasicAuthenticationFilter -[hidden]down- ExceptionTranslationFilter
+ExceptionTranslationFilter -[hidden]down- AuthorizationFilter
+AuthorizationFilter -[hidden]down- MethodSecurity
 
 package config {
   class SecurityConfig <<@Configuration>> {
@@ -107,7 +114,8 @@ SecurityConfig ..> AccessPolicy : URL rules
 SecurityConfig ..> ApiAuthenticationEntryPoint : 401
 SecurityConfig ..> ApiAccessDeniedHandler : 403
 
-BasicAuthenticationFilter --> DaoAuthenticationProvider : authenticate
+BasicAuthenticationFilter --> ProviderManager : authenticate
+ProviderManager --> DaoAuthenticationProvider : delegates
 DaoAuthenticationProvider --> DemoUserDetailsService : loadUserByUsername
 BasicAuthenticationFilter --> ApiAuthenticationEntryPoint : bad credentials
 DemoUserDetailsService ..> DemoUsers
@@ -137,7 +145,7 @@ AuditLog <|.. InMemoryAuditLog
 AuditLog o-- AuditEntry
 AuditEntry --> AuditKind
 AdminController --> AuditLog : entries
-DaoAuthenticationProvider ..> SecurityEventListener : authentication events
+ProviderManager ..> SecurityEventListener : authentication events
 AuthorizationFilter ..> SecurityEventListener : AuthorizationDeniedEvent
 MethodSecurity ..> SecurityEventListener : AuthorizationDeniedEvent
 @enduml

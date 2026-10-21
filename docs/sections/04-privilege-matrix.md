@@ -1,16 +1,8 @@
-<!-- Owner: Mallikarjuna (slice 4) -->
-<!--
-What belongs in this section:
-- The access table (the nine services, who may call each, the own-record rule, default deny).
-- The access matrix (every user type against every service, with the expected 200/201/401/403/404).
-- One paragraph on per-role versus per-actor access control (p. 174), pointing at the cells that show each.
--->
-
 # 4. Privilege matrix
 
 ## Access table
 
-The portal offers nine services, each identified by an HTTP method and a URL pattern. The table is
+The portal has nine services, each identified by an HTTP method and a URL pattern. The table is
 kept as data in `AccessRules`, and `AccessPolicy` generates the Spring Security URL rules from it in
 this order. "NURSE+" means NURSE or any role above it in the hierarchy ADMIN > DOCTOR > NURSE.
 PATIENT is outside the hierarchy. A "yes" in the last column means the per-actor own-record rule

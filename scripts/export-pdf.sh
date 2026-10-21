@@ -4,6 +4,10 @@
 #
 # The sections are docs/sections/01-*.md ... 09-*.md, joined in file-name order by pandoc.
 # Images are resolved relative to the repository root, docs/sections and uml/.
+# The Lua filter scripts/pdf-figures.lua puts each diagram on its own landscape page so the
+# large figures stay legible; it only affects LaTeX output, so the Markdown is untouched.
+# Code blocks are typeset with the listings package (--listings) so the long audit-log and demo
+# transcript lines wrap inside the page instead of running off the right edge.
 # pandoc needs a PDF engine; set PDF_ENGINE to choose one (for example xelatex, tectonic or
 # wkhtmltopdf), otherwise pandoc's default is used.
 set -euo pipefail
@@ -35,7 +39,13 @@ out="docs/design-document.pdf"
 pandoc "${sections[@]}" \
   --from=markdown \
   --resource-path=".:docs/sections:uml" \
+  --lua-filter=scripts/pdf-figures.lua \
+  --listings \
   --metadata title="Authentication and Authorization: Design Document" \
+  -V geometry:margin=2.5cm \
+  -V header-includes='\usepackage{graphicx}' \
+  -V header-includes='\usepackage{pdflscape}' \
+  -V header-includes='\lstset{breaklines=true,breakatwhitespace=false,basicstyle=\ttfamily\small,columns=fullflexible,keepspaces=true}' \
   ${engine_args[@]+"${engine_args[@]}"} \
   -o "$out"
 echo "export-pdf: wrote $out from ${#sections[@]} section file(s)"

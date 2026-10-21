@@ -1,20 +1,6 @@
-<!-- Owner: Godson (slice 1) for the login diagrams; Kobe (slice 2) for the request diagrams -->
-<!--
-What belongs in this section, each diagram with a short narrative:
-- uml/sequence/login-success.puml (slice 1): BasicAuthenticationFilter -> ProviderManager -> DaoAuthenticationProvider ->
-  DemoUserDetailsService -> PasswordEncoder -> AuthenticationSuccessEvent -> AuthorizationFilter -> controller.
-- uml/sequence/login-failure.puml (slice 1): the same chain ending in BadCredentialsException ->
-  AbstractAuthenticationFailureEvent -> ApiAuthenticationEntryPoint -> 401.
-- uml/sequence/authorized-request.puml (slice 2): nurse -> /api/patients/1/record through the role rule and OwnRecordGuard -> 200.
-- uml/sequence/forbidden-request.puml (slice 2): bob -> /api/patients/1/record, OwnRecordGuard denies ->
-  AuthorizationDeniedEvent -> ApiAccessDeniedHandler -> 403; side note on the pure role denial.
--->
-
 # 6. Sequence diagrams
 
 ## Login success and login failure
-
-<!-- Slice 1 (Godson) writes this subsection. -->
 
 Both diagrams follow one request to `GET /api/me`, the service that only asks for an authenticated
 caller. Under stateless HTTP Basic there is no separate login step: each request carries the
@@ -45,11 +31,6 @@ request. The PlantUML sources and text renderings are next to the images in `uml
    `200 OK`.
 
 Nothing is kept afterwards. The next request from the same client repeats all six steps.
-
-Step 6 describes the finished system, with the URL rules and the `/api/me` service in place. Until
-those are merged, the authorization scaffold denies every URL except the public one, so on the
-authentication work alone this same request is authenticated (steps 1 to 5 happen exactly as shown)
-and is then refused at `AuthorizationFilter`.
 
 ### Login failure
 
@@ -103,10 +84,6 @@ admitted through the staff hierarchy. Method security then calls `OwnRecordGuard
 does not hold `ROLE_PATIENT`, so the guard allows the call. Only then does the controller read
 the repository and return the record with 200.
 
-The diagram shows the completed service path. On the Step 0 baseline, the authorization checks
-are implemented by this slice but the controller and repository bodies await slice 3. Successful
-service responses belong to `AccessMatrixTest` during integration, rather than this slice's tests.
-
 ### Forbidden request
 
 ![Forbidden request](../../uml/sequence/forbidden-request.png)
@@ -116,10 +93,10 @@ but method security calls `OwnRecordGuard` and finds that his principal's patien
 The check returns false, publishes an `AuthorizationDeniedEvent` whose object is a
 `MethodInvocation`, and throws an access-denied exception. The controller body and repository
 are never called. `ExceptionTranslationFilter` recognizes an authenticated caller and invokes
-`ApiAccessDeniedHandler`, returning JSON with status 403 and the requested path.
+`ApiAccessDeniedHandler`, which returns JSON with status 403 and the requested path.
 
 The side note shows a pure role denial: a nurse posting a prescription is stopped by
 `AuthorizationFilter`, which publishes a denial event whose object is the HTTP request.
-Method security is never reached, and the same handler returns 403. An anonymous caller uses
-slice 1's 401 entry point instead. The audit listener receives these events once slice 3 is
-implemented; the event publisher is already wired in the shared configuration.
+Method security is never reached, and the same handler returns 403. An anonymous caller is sent
+to the 401 entry point instead. The audit listener receives both kinds of denial event through the
+publisher configured in `SecurityConfig`.

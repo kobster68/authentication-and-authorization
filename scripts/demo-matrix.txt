@@ -3,8 +3,8 @@
 # Columns: expected status, HTTP method, path, user, body.
 #   user  '-' (anonymous), a seeded username (password from demo.sh), or user:password
 #   body  '-', 'vitals' or 'prescription' (sent as JSON)
-# The trailing '# needs:' field names the slices a row depends on (0 = Step 0 alone).
-# A row is uncommented by the pull request that completes its needs set.
+# The trailing '# needs:' field records which parts of the system a row exercises
+# (1 authentication, 2 authorization, 3 services); every row is enabled.
 # AccessMatrixTest reads every row of this file, commented out or not, so keep the format exact.
 #
 # expected  method  path                              user               body          # needs: <slices>

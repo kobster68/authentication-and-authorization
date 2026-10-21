@@ -32,8 +32,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  *
  * <p>The cells are read from {@code scripts/demo-matrix.txt}, every row including the
  * commented-out ones, so the demo script and this test check the same matrix. This is the
- * cross-slice evidence: it needs authentication, authorization and the services together, so it
- * is enabled by whichever of slices 1 to 3 merges last.
+ * cross-cutting evidence: it needs authentication, authorization and the services together.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
