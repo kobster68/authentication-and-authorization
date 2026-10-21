@@ -2,7 +2,7 @@
 
 ## Access table
 
-The portal offers nine services, each identified by an HTTP method and a URL pattern. The table is
+The portal has nine services, each identified by an HTTP method and a URL pattern. The table is
 kept as data in `AccessRules`, and `AccessPolicy` generates the Spring Security URL rules from it in
 this order. "NURSE+" means NURSE or any role above it in the hierarchy ADMIN > DOCTOR > NURSE.
 PATIENT is outside the hierarchy. A "yes" in the last column means the per-actor own-record rule

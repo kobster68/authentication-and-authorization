@@ -93,7 +93,7 @@ but method security calls `OwnRecordGuard` and finds that his principal's patien
 The check returns false, publishes an `AuthorizationDeniedEvent` whose object is a
 `MethodInvocation`, and throws an access-denied exception. The controller body and repository
 are never called. `ExceptionTranslationFilter` recognizes an authenticated caller and invokes
-`ApiAccessDeniedHandler`, returning JSON with status 403 and the requested path.
+`ApiAccessDeniedHandler`, which returns JSON with status 403 and the requested path.
 
 The side note shows a pure role denial: a nurse posting a prescription is stopped by
 `AuthorizationFilter`, which publishes a denial event whose object is the HTTP request.

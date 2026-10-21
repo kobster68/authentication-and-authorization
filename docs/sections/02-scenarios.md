@@ -34,7 +34,7 @@ reading the audit log, is refused with 403 by the URL rule itself.
 
 ## The trusted-network assumption
 
-Both scenarios assume a **trusted local network**, and that assumption stands in for transport
+Both scenarios assume a **trusted local network**, and that assumption substitutes for transport
 encryption (TLS), which the prototype does not provide. HTTP Basic sends the username and password
 on every request, only Base64-encoded. Base64 is an encoding, not encryption: anyone who can read
 the traffic can recover the password. Over plain HTTP the credentials are therefore exposed on every

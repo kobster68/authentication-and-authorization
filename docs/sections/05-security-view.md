@@ -34,7 +34,7 @@ table as immutable `AccessRule` records. Each row supplies its HTTP method, path
 `Requirement` (`PermitAll`, `Authenticated`, or `AnyRole`), and own-record marker. `Role` names
 the four actor types; the staff hierarchy is supplied by `config.SecurityConfig`. `AccessPolicy`
 turns the table into URL authorization rules, permits ERROR dispatch first, and denies unlisted
-requests last. `OwnRecordGuard`, named `ownRecord`, supplies the per-actor check called by the
+requests last. `OwnRecordGuard`, named `ownRecord`, is the per-actor check called by the
 two patient read methods' `@PreAuthorize` annotations: patients must match their principal's
 patient ID, while staff already admitted by URL authorization may read any patient.
 `ApiAccessDeniedHandler` writes a consistent JSON 403 response using `web.ApiError` for an

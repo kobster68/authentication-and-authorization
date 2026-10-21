@@ -96,7 +96,7 @@ once". The sequence diagrams in Section 6 show the success and failure paths mes
 **Authorize Actors, per role.** Authorize Actors determines which services an authenticated
 actor may use (Bass, Clements, and Kazman, *Software Architecture in Practice*, 4th ed.,
 p. 174). `AuthorizationFilter` checks the request's HTTP method and URL before a controller
-runs. `AccessPolicy` generates these rules from `AccessRules.all()`, matching `PermitAll`,
+runs. `AccessPolicy` generates these rules from `AccessRules.all()`. It matches `PermitAll`,
 `Authenticated`, and `AnyRole` requirements to Spring Security's corresponding checks.
 Generating the rules keeps the runtime policy tied to the frozen access table instead of
 maintaining a second copy. `SecurityConfig` supplies the hierarchy ADMIN > DOCTOR > NURSE;
@@ -127,4 +127,4 @@ For an authenticated caller, `ExceptionTranslationFilter` routes the exception t
 
 ## Audit
 
-The `SecurityEventListener` applies the Audit tactic (SAiP 4th ed., p. 176) by recording each authentication success and failure and each authorization denial in the bounded, in-memory `AuditLog`, and by writing the same event to the application log at INFO. Each entry includes the time, username, event kind, HTTP method and request path, plus a failure exception name or denial reason. With stateless HTTP Basic, authentication occurs independently on each request, so each authenticated request produces an `AUTHN_SUCCESS` entry rather than a one-time login entry.
+The `SecurityEventListener` applies the Audit tactic (SAiP 4th ed., p. 176). It records each authentication success and failure and each authorization denial in the bounded, in-memory `AuditLog`, and writes the same event to the application log at INFO. Each entry includes the time, username, event kind, HTTP method and request path, plus a failure exception name or denial reason. With stateless HTTP Basic, authentication occurs independently on each request, so each authenticated request produces an `AUTHN_SUCCESS` entry rather than a one-time login entry.

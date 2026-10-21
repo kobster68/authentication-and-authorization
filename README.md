@@ -120,7 +120,7 @@ demo: 80 rows checked, 0 mismatch(es)
 
 These credentials are for evaluation only. The code stores only `{bcrypt}` hashes of the
 passwords (`DemoUsers`); the plaintext is published here on purpose so that each user type can be
-tried, so the committed hashes protect nothing secret. They show how passwords are stored, not a
+tried. The committed hashes therefore protect nothing secret. They show how passwords are stored, not a
 secret store. A real deployment would keep users outside the code and force a password change
 (Change Credential Settings, SAiP 4th ed., p. 175).
 
