@@ -4,7 +4,6 @@ import edu.rit.swen755.auth.access.AccessRule;
 import edu.rit.swen755.auth.access.AccessRules;
 import edu.rit.swen755.auth.authn.DemoUser;
 import edu.rit.swen755.auth.authn.DemoUsers;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -85,7 +84,6 @@ class DocsConsistencyTest {
     }
 
     @Test
-    @Disabled("TODO(integration) — enable in the integration pull request, once the verification section is filled")
     void noTodoMarkersRemainAnywhere() throws IOException {
         List<Path> files = new ArrayList<>(List.of(README));
         for (String name : SECTION_HEADINGS.keySet()) {
